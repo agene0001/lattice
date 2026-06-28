@@ -1,0 +1,27 @@
+[package]
+name = "lattice-app"
+version = "0.1.0"
+description = "Lattice — concept-graph adaptive tutoring (Tauri shell)"
+edition = "2021"
+
+[lib]
+# The `_lib` suffix keeps the lib name distinct from the bin (a Windows quirk;
+# see rust-lang/cargo#8519).
+name = "lattice_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+keyring = { workspace = true }
+
+# The shell is a thin adapter over the service — no domain logic here (spec §9).
+lattice-core = { workspace = true }
+lattice-graph = { workspace = true }
+lattice-storage = { workspace = true }
+lattice-service = { workspace = true }

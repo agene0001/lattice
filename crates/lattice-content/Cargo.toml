@@ -1,0 +1,19 @@
+[package]
+name = "lattice-content"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Exercise generation: template engine + subject loading (spec §2.3, §5)."
+
+[dependencies]
+lattice-core = { workspace = true }
+lattice-llm = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+# Used only to assert the *authored* math graph is a valid DAG (no prod dep).
+lattice-graph = { workspace = true }

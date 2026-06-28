@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "src-tauri"]
+# Routine `cargo build`/`test` skips the (slow-to-compile) Tauri app; build it
+# explicitly with `-p lattice-app` or via `npm run tauri dev`.
+default-members = ["crates/*"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.80"
+
+# Centralized dependency versions. Members opt in with `{ workspace = true }`,
+# so there's exactly one place to bump a version across the whole project.
+[workspace.dependencies]
+# Internal crates
+lattice-core = { path = "crates/lattice-core" }
+lattice-content = { path = "crates/lattice-content" }
+lattice-graph = { path = "crates/lattice-graph" }
+lattice-storage = { path = "crates/lattice-storage" }
+lattice-service = { path = "crates/lattice-service" }
+lattice-diagnosis = { path = "crates/lattice-diagnosis" }
+lattice-llm = { path = "crates/lattice-llm" }
+
+# Third-party
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde", "clock"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "1"
+rand = "0.9"
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "chrono", "uuid"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+keyring = { version = "3", features = ["apple-native"] }
+
+# Smaller, faster release binaries for the eventual Tauri bundle.
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

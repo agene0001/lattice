@@ -1,0 +1,71 @@
+{
+  "subject": {
+    "id": "math",
+    "name": "Mathematics for Machine Learning"
+  },
+  "groups": [
+    "Foundations",
+    "Algebra",
+    "Linear Algebra",
+    "Calculus",
+    "Probability & Statistics",
+    "Machine Learning"
+  ],
+  "concepts": [
+    { "id": "arithmetic", "label": "Arithmetic", "group": "Foundations", "prerequisites": [],
+      "description": "Integer and rational arithmetic, order of operations." },
+
+    { "id": "algebraic_manipulation", "label": "Algebraic Manipulation", "group": "Algebra", "prerequisites": ["arithmetic"],
+      "description": "Rearranging equations, isolating variables, distributing." },
+    { "id": "exponent_rules", "label": "Exponent Rules", "group": "Algebra", "prerequisites": ["arithmetic"],
+      "description": "Product, quotient, and power rules for exponents." },
+    { "id": "functions", "label": "Functions", "group": "Algebra", "prerequisites": ["algebraic_manipulation"],
+      "description": "Function notation, domain/range, composition." },
+    { "id": "factoring", "label": "Factoring", "group": "Algebra", "prerequisites": ["algebraic_manipulation"],
+      "description": "Factoring polynomials, including difference of squares." },
+
+    { "id": "vectors", "label": "Vectors", "group": "Linear Algebra", "prerequisites": ["arithmetic"],
+      "description": "Vectors as ordered tuples; geometric and list views." },
+    { "id": "vector_operations", "label": "Vector Operations", "group": "Linear Algebra", "prerequisites": ["vectors", "algebraic_manipulation"],
+      "description": "Addition, scalar multiplication, linear combinations." },
+    { "id": "dot_product", "label": "Dot Product", "group": "Linear Algebra", "prerequisites": ["vector_operations"],
+      "description": "Inner product of two vectors; the primitive under every layer." },
+    { "id": "matrices", "label": "Matrices", "group": "Linear Algebra", "prerequisites": ["vectors"],
+      "description": "Matrices as collections of vectors; shape and indexing." },
+    { "id": "matrix_vector_product", "label": "Matrix-Vector Product", "group": "Linear Algebra", "prerequisites": ["matrices", "dot_product"],
+      "description": "Applying a matrix to a vector as a stack of dot products." },
+    { "id": "matrix_multiplication", "label": "Matrix Multiplication", "group": "Linear Algebra", "prerequisites": ["matrix_vector_product"],
+      "description": "Composing linear maps; the workhorse of a forward pass." },
+
+    { "id": "limits", "label": "Limits", "group": "Calculus", "prerequisites": ["functions"],
+      "description": "Limit of a function; the basis of the derivative." },
+    { "id": "derivatives", "label": "Derivatives", "group": "Calculus", "prerequisites": ["limits"],
+      "description": "Instantaneous rate of change; slope of the tangent." },
+    { "id": "power_rule", "label": "Power Rule", "group": "Calculus", "prerequisites": ["derivatives", "exponent_rules"],
+      "description": "Differentiating monomials a*x^n." },
+    { "id": "chain_rule", "label": "Chain Rule", "group": "Calculus", "prerequisites": ["derivatives", "functions"],
+      "description": "Differentiating compositions; the heart of backprop." },
+    { "id": "partial_derivatives", "label": "Partial Derivatives", "group": "Calculus", "prerequisites": ["derivatives", "vectors"],
+      "description": "Derivatives of multivariate functions, one variable at a time." },
+    { "id": "gradients", "label": "Gradients", "group": "Calculus", "prerequisites": ["partial_derivatives", "vector_operations"],
+      "description": "The vector of partial derivatives; direction of steepest ascent." },
+
+    { "id": "probability_basics", "label": "Probability Basics", "group": "Probability & Statistics", "prerequisites": ["arithmetic"],
+      "description": "Sample spaces, events, probability axioms." },
+    { "id": "random_variables", "label": "Random Variables", "group": "Probability & Statistics", "prerequisites": ["probability_basics", "functions"],
+      "description": "Mapping outcomes to numbers; discrete and continuous." },
+    { "id": "expectation", "label": "Expectation", "group": "Probability & Statistics", "prerequisites": ["random_variables"],
+      "description": "The mean of a random variable; a weighted average." },
+    { "id": "variance", "label": "Variance", "group": "Probability & Statistics", "prerequisites": ["expectation"],
+      "description": "Expected squared deviation; spread of a distribution." },
+    { "id": "conditional_probability", "label": "Conditional Probability", "group": "Probability & Statistics", "prerequisites": ["probability_basics"],
+      "description": "P(A | B); updating belief given evidence." },
+    { "id": "bayes_theorem", "label": "Bayes' Theorem", "group": "Probability & Statistics", "prerequisites": ["conditional_probability"],
+      "description": "Inverting conditionals; the basis of probabilistic inference." },
+
+    { "id": "gradient_descent", "label": "Gradient Descent", "group": "Machine Learning", "prerequisites": ["gradients", "vector_operations"],
+      "description": "Iteratively stepping downhill along the negative gradient." },
+    { "id": "maximum_likelihood", "label": "Maximum Likelihood", "group": "Machine Learning", "prerequisites": ["expectation", "derivatives", "bayes_theorem"],
+      "description": "Fitting parameters by maximizing the likelihood of the data." }
+  ]
+}

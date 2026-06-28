@@ -1,0 +1,21 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.svelte-kit/
+
+# Local databases / scratch
+*.db
+*.duckdb
+*.sqlite
+
+# OS / editor
+.DS_Store
+# macOS AppleDouble sidecars (exFAT scatters these; they break tauri-build)
+._*
+.idea/
+.vscode/
