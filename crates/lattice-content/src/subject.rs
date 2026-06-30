@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use lattice_core::{Concept, ConceptId, SubjectId};
+use lattice_core::{Attribution, Concept, ConceptId, Difficulty, SubjectId};
 use serde::Deserialize;
 
 use crate::template::Template;
@@ -20,6 +20,21 @@ pub struct Subject {
     pub groups: Vec<String>,
     pub concepts: Vec<Concept>,
     pub templates: Vec<Template>,
+    /// Hand-authored/curated problems served verbatim (no generator). The data
+    /// path for adding your own problems — see `subjects/<id>/problems.json`.
+    pub static_problems: Vec<StaticProblem>,
+}
+
+/// One curated problem from `problems.json`: a literal statement + answer, with
+/// optional attribution for adapted openly-licensed material.
+#[derive(Debug, Clone)]
+pub struct StaticProblem {
+    pub id: String,
+    pub concept: ConceptId,
+    pub difficulty: Difficulty,
+    pub content: String,
+    pub solution: String,
+    pub attribution: Option<Attribution>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -74,12 +89,27 @@ pub fn load_subject(dir: impl AsRef<Path>) -> Result<Subject, LoadError> {
         Vec::new()
     };
 
+    // `problems.json` is optional — a subject can ship with only templates, only
+    // curated problems, or both.
+    let problems_path = dir.join("problems.json");
+    let static_problems = if problems_path.exists() {
+        let raw = read(&problems_path)?;
+        parse::<ProblemsFile>(&problems_path, &raw)?
+            .problems
+            .into_iter()
+            .map(StaticProblemDef::into_static)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     Ok(Subject {
         id: subject_id,
         name: concepts_file.subject.name,
         groups: concepts_file.groups,
         concepts,
         templates,
+        static_problems,
     })
 }
 
@@ -137,6 +167,46 @@ struct ConceptDef {
 #[derive(Deserialize)]
 struct TemplatesFile {
     templates: Vec<Template>,
+}
+
+#[derive(Deserialize)]
+struct ProblemsFile {
+    #[serde(default)]
+    problems: Vec<StaticProblemDef>,
+}
+
+#[derive(Deserialize)]
+struct StaticProblemDef {
+    id: String,
+    concept: ConceptId,
+    difficulty: Difficulty,
+    content: String,
+    solution: String,
+    /// Flat `source`/`license` keys in JSON, folded into an [`Attribution`].
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    license: Option<String>,
+}
+
+impl StaticProblemDef {
+    fn into_static(self) -> StaticProblem {
+        let attribution = self
+            .source
+            .filter(|s| !s.trim().is_empty())
+            .map(|source| Attribution {
+                source,
+                license: self.license.filter(|s| !s.trim().is_empty()),
+            });
+        StaticProblem {
+            id: self.id,
+            concept: self.concept,
+            difficulty: self.difficulty,
+            content: self.content,
+            solution: self.solution,
+            attribution,
+        }
+    }
 }
 
 #[cfg(test)]

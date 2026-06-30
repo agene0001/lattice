@@ -155,6 +155,7 @@ impl Template {
             content: instance.content,
             solution: instance.solution,
             generated_by: ProblemSource::Template,
+            attribution: None,
         }
     }
 }

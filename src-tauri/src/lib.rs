@@ -5,7 +5,9 @@
 //! handful of `#[tauri::command]`s that forward to the service. A future
 //! `lattice-api` (Axum) would be the same forwarding over HTTP instead of IPC.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use lattice_core::{AttemptId, ConceptId, Diagnosis, Difficulty, LearnerId, Problem, ProblemId};
 use lattice_graph::{Bkt, BktParams};
@@ -24,10 +26,36 @@ type Service = LatticeService<SqliteStorage, Bkt>;
 const SOLO_LEARNER: LearnerId =
     LearnerId(Uuid::from_u128(0x1a77_1ce0_0000_4000_8000_0000_0000_0001));
 
+/// One [`LatticeService`] per subject, keyed by subject id, plus the currently
+/// selected subject. The map is immutable after setup, so commands borrow a
+/// `&Service` straight from it; only the *selection* needs a lock.
 struct AppState {
-    service: Service,
+    subjects: HashMap<String, Service>,
+    /// Subjects in display order (discovery order), for the switcher.
+    order: Vec<SubjectSummary>,
+    active: Mutex<String>,
     learner: LearnerId,
     config_dir: PathBuf,
+}
+
+impl AppState {
+    /// The service for the currently selected subject.
+    fn active_service(&self) -> Result<&Service, String> {
+        let id = self
+            .active
+            .lock()
+            .map_err(|_| "subject selection lock poisoned".to_string())?
+            .clone();
+        self.subjects
+            .get(&id)
+            .ok_or_else(|| format!("unknown subject: {id}"))
+    }
+}
+
+#[derive(Serialize, Clone)]
+struct SubjectSummary {
+    id: String,
+    name: String,
 }
 
 #[derive(Serialize)]
@@ -41,19 +69,39 @@ fn to_message(err: ServiceError) -> String {
     err.to_string()
 }
 
+/// The subjects available to switch between (the whole `subjects/` directory).
+#[tauri::command]
+async fn list_subjects(state: State<'_, AppState>) -> Result<Vec<SubjectSummary>, String> {
+    Ok(state.order.clone())
+}
+
+/// Switch the active subject. Subsequent commands operate on it.
+#[tauri::command]
+async fn select_subject(state: State<'_, AppState>, subject_id: String) -> Result<(), String> {
+    if !state.subjects.contains_key(&subject_id) {
+        return Err(format!("unknown subject: {subject_id}"));
+    }
+    *state
+        .active
+        .lock()
+        .map_err(|_| "subject selection lock poisoned".to_string())? = subject_id;
+    Ok(())
+}
+
 #[tauri::command]
 async fn subject_info(state: State<'_, AppState>) -> Result<SubjectInfo, String> {
+    let service = state.active_service()?;
     Ok(SubjectInfo {
-        id: state.service.subject_id().to_string(),
-        name: state.service.subject_name().to_string(),
-        groups: state.service.groups().to_vec(),
+        id: service.subject_id().to_string(),
+        name: service.subject_name().to_string(),
+        groups: service.groups().to_vec(),
     })
 }
 
 #[tauri::command]
 async fn concept_map(state: State<'_, AppState>) -> Result<Vec<ConceptStatus>, String> {
     state
-        .service
+        .active_service()?
         .concept_map(state.learner)
         .await
         .map_err(to_message)
@@ -62,7 +110,7 @@ async fn concept_map(state: State<'_, AppState>) -> Result<Vec<ConceptStatus>, S
 #[tauri::command]
 async fn next_problem(state: State<'_, AppState>) -> Result<Problem, String> {
     state
-        .service
+        .active_service()?
         .next_problem(state.learner)
         .await
         .map_err(to_message)
@@ -75,7 +123,7 @@ async fn submit_attempt(
     submitted_work: String,
 ) -> Result<AttemptOutcome, String> {
     state
-        .service
+        .active_service()?
         .submit_attempt(state.learner, problem_id, submitted_work)
         .await
         .map_err(to_message)
@@ -87,7 +135,7 @@ async fn practice_concept(
     concept_id: ConceptId,
 ) -> Result<Problem, String> {
     state
-        .service
+        .active_service()?
         .practice_concept(state.learner, concept_id)
         .await
         .map_err(to_message)
@@ -101,7 +149,7 @@ async fn practice_concept(
 
 #[tauri::command]
 async fn lesson(state: State<'_, AppState>, concept_id: ConceptId) -> Result<Lesson, String> {
-    state.service.lesson(&concept_id).map_err(to_message)
+    state.active_service()?.lesson(&concept_id).map_err(to_message)
 }
 
 #[tauri::command]
@@ -118,7 +166,7 @@ async fn draft_lesson(
         model: settings.model,
     };
     state
-        .service
+        .active_service()?
         .draft_lesson(&concept_id, &provider)
         .await
         .map_err(to_message)
@@ -131,20 +179,20 @@ async fn save_lesson(
     markdown: String,
 ) -> Result<(), String> {
     state
-        .service
+        .active_service()?
         .save_lesson(&concept_id, &markdown)
         .map_err(to_message)
 }
 
 #[tauri::command]
 async fn model_params(state: State<'_, AppState>) -> Result<BktParams, String> {
-    Ok(state.service.model_params())
+    Ok(state.active_service()?.model_params())
 }
 
 #[tauri::command]
 async fn refit_model(state: State<'_, AppState>) -> Result<BktParams, String> {
     state
-        .service
+        .active_service()?
         .refit_model(state.learner)
         .await
         .map_err(to_message)
@@ -279,7 +327,7 @@ async fn diagnose_attempt(
         model: settings.model,
     };
     state
-        .service
+        .active_service()?
         .diagnose_attempt(attempt_id, problem_id, &submitted_work, &provider)
         .await
         .map_err(to_message)
@@ -300,16 +348,31 @@ async fn generate_ai_problem(
         model: settings.model,
     };
     state
-        .service
+        .active_service()?
         .generate_ai_problem(state.learner, concept_id, difficulty, &provider)
         .await
         .map_err(to_message)
 }
 
-/// Where the subject data lives. For V1/dev it sits next to `src-tauri` in the
-/// repo; bundling it as a Tauri resource is a release-time follow-up.
-fn subject_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../subjects/math")
+/// The root holding every subject directory. For V1/dev it sits next to
+/// `src-tauri` in the repo; bundling it as a Tauri resource is a release-time
+/// follow-up.
+fn subjects_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../subjects")
+}
+
+/// Every subject directory under [`subjects_root`] — any subdirectory that has a
+/// `concepts.json`. Sorted for a stable switcher order.
+fn discover_subject_dirs() -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(subjects_root())
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.join("concepts.json").is_file())
+        .collect();
+    dirs.sort();
+    dirs
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -321,24 +384,47 @@ pub fn run() {
                 .app_data_dir()
                 .expect("resolve app data dir");
             std::fs::create_dir_all(&data_dir).ok();
-            let db_path = data_dir.join("lattice.db");
 
-            // The service init is async (SQLite connect + migrate); run it to
-            // completion on Tauri's runtime before the first window paints.
-            let service = tauri::async_runtime::block_on(LatticeService::bootstrap(
-                subject_dir(),
-                db_path,
-            ))
-            .expect("initialize lattice service");
+            // Bootstrap one service per subject, each with its own SQLite file so
+            // subjects stay fully isolated (no concept-id collisions across
+            // subjects). The service init is async; run it to completion on
+            // Tauri's runtime before the first window paints.
+            let mut subjects = HashMap::new();
+            let mut order = Vec::new();
+            for dir in discover_subject_dirs() {
+                let dir_name = dir
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "subject".to_string());
+                let db_path = data_dir.join(format!("lattice-{dir_name}.db"));
+                let service = tauri::async_runtime::block_on(LatticeService::bootstrap(
+                    &dir, db_path,
+                ))
+                .unwrap_or_else(|e| panic!("initialize subject `{dir_name}`: {e}"));
+                let id = service.subject_id().to_string();
+                order.push(SubjectSummary {
+                    id: id.clone(),
+                    name: service.subject_name().to_string(),
+                });
+                subjects.insert(id, service);
+            }
+            let active = order
+                .first()
+                .map(|s| s.id.clone())
+                .expect("at least one subject under subjects/");
 
             app.manage(AppState {
-                service,
+                subjects,
+                order,
+                active: Mutex::new(active),
                 learner: SOLO_LEARNER,
                 config_dir: data_dir,
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_subjects,
+            select_subject,
             subject_info,
             concept_map,
             next_problem,

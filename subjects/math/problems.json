@@ -1,0 +1,36 @@
+{
+  "_comment": "Curated problems served verbatim — no generator, no solver. Add your own here: content is KaTeX (use \\text{...} for words), solution is the final answer (numeric/fraction compared by value, else substring). Optional source/license attribute adapted openly-licensed material (e.g. OpenStax CC-BY, MIT OCW CC BY-NC-SA).",
+  "problems": [
+    {
+      "id": "prob_die_gt4",
+      "concept": "probability_basics",
+      "difficulty": "easy",
+      "content": "\\text{A fair six-sided die is rolled. } P(\\text{roll} > 4) = \\;? \\quad \\text{(reduced fraction)}",
+      "solution": "1/3",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "prob_not_green",
+      "concept": "probability_basics",
+      "difficulty": "medium",
+      "content": "\\text{A bag holds 4 red and 6 green marbles. One is drawn at random. } P(\\text{not green}) = \\;?",
+      "solution": "2/5",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "grad_circle_34",
+      "concept": "gradients",
+      "difficulty": "easy",
+      "content": "f(x,y) = x^2 + y^2. \\quad \\nabla f \\text{ at } (3, 4) = \\;?",
+      "solution": "6, 8",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "arith_precedence_1",
+      "concept": "arithmetic",
+      "difficulty": "easy",
+      "content": "2 + 3 \\times 4 - 5 = \\;?",
+      "solution": "9"
+    }
+  ]
+}

@@ -4,6 +4,8 @@
   import Katex from '$lib/Math.svelte';
   import Lesson from '$lib/Lesson.svelte';
   import {
+    listSubjects,
+    selectSubject,
     subjectInfo,
     conceptMap,
     nextProblem,
@@ -22,6 +24,8 @@
   } from '$lib/api.js';
 
   let subject = $state(null);
+  let subjects = $state([]); // all available subjects (the switcher)
+  let currentSubjectId = $state(null);
   let view = $state('practice'); // 'practice' | 'map'
   let problem = $state(null);
   let work = $state('');
@@ -65,16 +69,45 @@
 
   onMount(async () => {
     try {
-      subject = await subjectInfo();
-      model = await modelParams();
+      subjects = await listSubjects();
       settings = await getDiagnosisSettings();
       selProvider = settings.provider;
       selModel = settings.model;
-      await Promise.all([refreshMap(), loadProblem()]);
+      await loadSubject();
     } catch (e) {
       error = String(e);
     }
   });
+
+  // Load (or reload) everything tied to the active subject.
+  async function loadSubject() {
+    subject = await subjectInfo();
+    currentSubjectId = subject?.id ?? null;
+    model = await modelParams();
+    await Promise.all([refreshMap(), loadProblem()]);
+  }
+
+  // Switch subjects: tell the backend, then reload its graph, lesson, problem.
+  async function switchSubject(id) {
+    if (!id || id === currentSubjectId || busy) return;
+    busy = true;
+    error = null;
+    try {
+      await selectSubject(id);
+      // Reset per-subject view state so nothing leaks across subjects.
+      problem = null;
+      outcome = null;
+      diagnosis = null;
+      learnSel = null;
+      lessonData = null;
+      view = 'practice';
+      await loadSubject();
+    } catch (e) {
+      error = String(e);
+    } finally {
+      busy = false;
+    }
+  }
 
   async function refreshMap() {
     concepts = await conceptMap();
@@ -397,7 +430,20 @@
       <span class="logo">▦</span>
       <div>
         <h1>Lattice</h1>
-        <p class="muted">{subject?.name ?? 'Loading…'}</p>
+        {#if subjects.length > 1}
+          <select
+            class="subject-switch"
+            value={currentSubjectId}
+            onchange={(e) => switchSubject(e.currentTarget.value)}
+            disabled={busy}
+          >
+            {#each subjects as s}
+              <option value={s.id}>{s.name}</option>
+            {/each}
+          </select>
+        {:else}
+          <p class="muted">{subject?.name ?? 'Loading…'}</p>
+        {/if}
       </div>
     </div>
     <nav>
@@ -436,6 +482,7 @@
           <div class="tags">
             <span class="badge {problem.difficulty}">{problem.difficulty}</span>
             {#if problem.generated_by === 'ai'}<span class="badge ai">AI</span>{/if}
+            {#if problem.generated_by === 'static'}<span class="badge curated">curated</span>{/if}
             {#each problem.concepts as c}
               {@render conceptChip(c, '')}
             {/each}
@@ -444,6 +491,13 @@
           <div class="statement">
             <Katex tex={problem.content} display />
           </div>
+
+          {#if problem.attribution}
+            <p class="attribution muted">
+              Source: {problem.attribution.source}{#if problem.attribution.license}
+                · {problem.attribution.license}{/if}
+            </p>
+          {/if}
 
           {#if problemPrereqs.length}
             <div class="builds-on">
@@ -718,6 +772,12 @@
             {:else if lessonData.notes}
               <article class="card lesson-content">
                 <Lesson source={lessonData.notes} />
+                {#if lessonData.source}
+                  <p class="attribution muted">
+                    Adapted from {lessonData.source}{#if lessonData.license}
+                      · {lessonData.license}{/if}
+                  </p>
+                {/if}
               </article>
               <div class="actions">
                 <button class="ghost" onclick={startEdit}>Edit lesson</button>

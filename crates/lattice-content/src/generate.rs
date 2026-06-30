@@ -53,6 +53,7 @@ pub async fn generate_problem(
                 content: candidate.content,
                 solution: candidate.solution,
                 generated_by: ProblemSource::Ai,
+                attribution: None,
             });
         }
     }

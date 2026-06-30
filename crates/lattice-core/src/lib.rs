@@ -142,6 +142,23 @@ pub enum Difficulty {
 pub enum ProblemSource {
     Template,
     Ai,
+    /// A hand-authored or curated problem served verbatim from a subject's
+    /// `problems.json` — no generator, no solver. The data path for dropping in
+    /// problems from your own notes or openly-licensed sets (spec §2.6).
+    Static,
+}
+
+/// Where a piece of content came from, kept so adapted openly-licensed material
+/// (e.g. OpenStax CC-BY, MIT OCW CC BY-NC-SA) carries its required attribution.
+/// Applies to lessons (via Markdown frontmatter) and static problems.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Attribution {
+    /// Human-readable origin, e.g. `"MIT OCW 18.01"` or `"OpenStax Calculus Vol 1"`.
+    pub source: String,
+    /// License identifier, e.g. `"CC BY-NC-SA 4.0"`. Optional but strongly
+    /// encouraged for anything adapted from an external source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
 }
 
 /// A node in the prerequisite DAG (spec §5).
@@ -192,6 +209,11 @@ pub struct Problem {
     pub content: String,
     pub solution: String,
     pub generated_by: ProblemSource,
+    /// Attribution for the source material, when adapted from an external set.
+    /// Present only on static problems and only at serve time — it's display
+    /// metadata, not persisted (grading re-fetches by id without needing it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attribution: Option<Attribution>,
 }
 
 /// A learner's submitted attempt (spec §5).

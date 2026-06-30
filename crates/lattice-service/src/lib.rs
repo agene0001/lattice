@@ -12,10 +12,10 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
-use lattice_content::{load_subject, Subject, Template};
+use lattice_content::{load_subject, split_frontmatter, StaticProblem, Subject, Template};
 use lattice_core::{
     Attempt, AttemptId, ConceptId, Diagnosis, DiagnosisId, Difficulty, LearnerId, MasteryState,
-    Problem, ProblemId, SubjectId,
+    Problem, ProblemId, ProblemSource, SubjectId,
 };
 use lattice_diagnosis::DiagnosisRequest;
 pub use lattice_diagnosis::{Provider, ProviderConfig};
@@ -92,10 +92,23 @@ pub struct Lesson {
     pub label: String,
     pub group: String,
     pub prerequisites: Vec<ConceptId>,
-    /// Original Markdown+KaTeX lesson, or `None` if none has been written yet.
+    /// Original Markdown+KaTeX lesson body (frontmatter stripped), or `None` if
+    /// none has been written yet.
     pub notes: Option<String>,
+    /// Attribution from the lesson's frontmatter, when adapted from a source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
     /// Whether practice exists for this concept (drives the "Practice" button).
     pub practiceable: bool,
+}
+
+/// One way to practise a concept: a generator template (fresh numbers each time)
+/// or a curated static problem (served verbatim). The practice pool mixes both.
+enum PracticeItem<'a> {
+    Template(&'a Template),
+    Static(&'a StaticProblem),
 }
 
 /// The orchestrator. Generic over the [`Storage`] backend and the
@@ -146,10 +159,10 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
         let frontier = ready_frontier(&self.graph, &masteries, &self.model, now);
         let target = frontier
             .iter()
-            .find(|c| self.has_template(c))
-            .or_else(|| self.first_templated_concept())
-            .ok_or(ServiceError::EmptySubject)?
-            .clone();
+            .find(|c| self.has_practice(c))
+            .cloned()
+            .or_else(|| self.first_practiceable_concept())
+            .ok_or(ServiceError::EmptySubject)?;
 
         self.generate_for(&target)
             .await?
@@ -327,7 +340,7 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
                     estimated_mastery: mastery
                         .map_or(0.0, |m| self.model.estimated_mastery(m, now)),
                     state: mastery.map(|m| m.state),
-                    practiceable: self.has_template(&c.id),
+                    practiceable: self.has_practice(&c.id),
                     has_notes: self.has_notes(&c.id),
                 }
             })
@@ -345,13 +358,24 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
             .graph
             .get(concept)
             .ok_or_else(|| ServiceError::UnknownConcept(concept.clone()))?;
+        // Strip optional frontmatter so the body renders cleanly and the source
+        // /license surface separately for attribution.
+        let (meta, notes) = match self.read_notes(concept) {
+            Some(raw) => {
+                let (meta, body) = split_frontmatter(&raw);
+                (meta, (!body.trim().is_empty()).then(|| body.to_string()))
+            }
+            None => (Default::default(), None),
+        };
         Ok(Lesson {
             concept_id: c.id.clone(),
             label: c.label.clone(),
             group: c.group.clone(),
             prerequisites: c.prerequisites.clone(),
-            notes: self.read_notes(concept),
-            practiceable: self.has_template(concept),
+            notes,
+            source: meta.source,
+            license: meta.license,
+            practiceable: self.has_practice(concept),
         })
     }
 
@@ -419,8 +443,15 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
 
     // --- internals ---
 
-    fn has_template(&self, concept: &ConceptId) -> bool {
+    /// Whether `concept` has *any* practice — a generator template or a curated
+    /// static problem. Drives the practiceable flag and the next-problem pick.
+    fn has_practice(&self, concept: &ConceptId) -> bool {
         self.subject.templates.iter().any(|t| &t.concept == concept)
+            || self
+                .subject
+                .static_problems
+                .iter()
+                .any(|p| &p.concept == concept)
     }
 
     /// On-disk path for a concept's lesson, when the subject root is known.
@@ -454,35 +485,61 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
                 .is_some_and(|c| c.notes.is_some())
     }
 
-    fn first_templated_concept(&self) -> Option<&ConceptId> {
-        self.subject.templates.first().map(|t| &t.concept)
+    /// The first concept (in graph order) with any practice — the deterministic
+    /// fallback when the ready frontier has nothing practiceable.
+    fn first_practiceable_concept(&self) -> Option<ConceptId> {
+        self.graph
+            .concepts()
+            .map(|c| &c.id)
+            .find(|id| self.has_practice(id))
+            .cloned()
     }
 
-    /// All templates that drill `concept`, in authored order. A concept can have
-    /// several — different difficulty tiers and different problem *forms* — and
-    /// [`generate_for`](Self::generate_for) picks among them at random so repeated
-    /// practice varies instead of serving the same form every time.
-    fn templates_for(&self, concept: &ConceptId) -> Vec<&Template> {
-        self.subject
+    /// Every way to practise `concept`: each generator template plus each curated
+    /// static problem. A concept can have several — difficulty tiers and distinct
+    /// problem *forms* — and [`generate_for`](Self::generate_for) picks one at
+    /// random so repeated practice varies instead of repeating one form.
+    fn practice_pool<'a>(&'a self, concept: &ConceptId) -> Vec<PracticeItem<'a>> {
+        let templates = self
+            .subject
             .templates
             .iter()
             .filter(|t| &t.concept == concept)
-            .collect()
+            .map(PracticeItem::Template);
+        let statics = self
+            .subject
+            .static_problems
+            .iter()
+            .filter(|p| &p.concept == concept)
+            .map(PracticeItem::Static);
+        templates.chain(statics).collect()
     }
 
-    /// Generate + persist a problem for `concept`, or `None` if it has no
-    /// template. When several templates target the concept, one is chosen
-    /// uniformly at random for variety. The RNG is created and dropped inside the
-    /// sync block so the returned future stays `Send`.
+    /// Materialise + persist a problem for `concept`, or `None` if it has no
+    /// practice at all. One item from the pool is chosen uniformly at random; a
+    /// template is generated fresh, a static problem is served verbatim with a new
+    /// id. The RNG is created and dropped inside the sync block so the returned
+    /// future stays `Send`.
     async fn generate_for(&self, concept: &ConceptId) -> Result<Option<Problem>, ServiceError> {
-        let templates = self.templates_for(concept);
-        if templates.is_empty() {
+        let pool = self.practice_pool(concept);
+        if pool.is_empty() {
             return Ok(None);
         }
         let problem = {
             let mut rng = rand::rng();
-            let template = templates[rng.random_range(0..templates.len())];
-            template.generate(&self.subject.id, &mut rng)
+            match pool[rng.random_range(0..pool.len())] {
+                PracticeItem::Template(t) => t.generate(&self.subject.id, &mut rng),
+                PracticeItem::Static(s) => Problem {
+                    id: ProblemId::new(),
+                    subject_id: self.subject.id.clone(),
+                    concepts: vec![s.concept.clone()],
+                    difficulty: s.difficulty,
+                    content: s.content.clone(),
+                    solution: s.solution.clone(),
+                    generated_by: ProblemSource::Static,
+                    attribution: s.attribution.clone(),
+                },
+            }
         };
         self.storage.save_problem(&problem).await?;
         Ok(Some(problem))
@@ -554,6 +611,7 @@ mod tests {
             content: String::new(),
             solution: sol.to_string(),
             generated_by: ProblemSource::Template,
+            attribution: None,
         }
     }
 
@@ -659,6 +717,47 @@ mod tests {
         ));
 
         std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[tokio::test]
+    async fn serves_curated_static_problems_with_attribution() {
+        // A subject with a concept that has ONLY a curated static problem (no
+        // template) — the "add your own problems as data" path.
+        let dir = std::env::temp_dir().join(format!("lattice-static-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("concepts.json"),
+            r#"{"subject":{"id":"t","name":"T"},"groups":["G"],
+                "concepts":[{"id":"a","label":"A","group":"G","prerequisites":[]}]}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("problems.json"),
+            r#"{"problems":[{"id":"p1","concept":"a","difficulty":"easy",
+                "content":"1+1=?","solution":"2","source":"OpenStax","license":"CC BY 4.0"}]}"#,
+        )
+        .unwrap();
+
+        let subject = load_subject(&dir).unwrap();
+        let storage = SqliteStorage::connect_in_memory().await.unwrap();
+        let svc = LatticeService::new(subject, storage, Bkt::default()).unwrap();
+        let learner = LearnerId::new();
+
+        let p = svc
+            .practice_concept(learner, ConceptId::new("a"))
+            .await
+            .unwrap();
+        assert_eq!(p.generated_by, ProblemSource::Static);
+        assert_eq!(p.solution, "2");
+        let attr = p.attribution.clone().expect("attribution flows through");
+        assert_eq!(attr.source, "OpenStax");
+        assert_eq!(attr.license.as_deref(), Some("CC BY 4.0"));
+
+        // It grades through the normal loop even though attribution isn't persisted.
+        let outcome = svc.submit_attempt(learner, p.id, "2".into()).await.unwrap();
+        assert!(outcome.is_correct);
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[tokio::test]

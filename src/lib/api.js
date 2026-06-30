@@ -2,6 +2,9 @@
 // Tauri maps these camelCase JS keys to the snake_case Rust parameters.
 import { invoke } from '@tauri-apps/api/core';
 
+// --- Subjects (multi-subject: the app boots one service per subjects/<id>/) ---
+export const listSubjects = () => invoke('list_subjects');
+export const selectSubject = (subjectId) => invoke('select_subject', { subjectId });
 export const subjectInfo = () => invoke('subject_info');
 export const conceptMap = () => invoke('concept_map');
 export const nextProblem = () => invoke('next_problem');

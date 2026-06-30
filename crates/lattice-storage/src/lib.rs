@@ -309,6 +309,8 @@ impl Storage for SqliteStorage {
             content: row.try_get("content")?,
             solution: row.try_get("solution")?,
             generated_by: enum_from_db(&row.try_get::<String, _>("generated_by")?)?,
+            // Attribution is display-only and not persisted; absent on reload.
+            attribution: None,
         }))
     }
 
@@ -477,6 +479,7 @@ mod tests {
             content: "factor x^2 - 1".into(),
             solution: "(x-1)(x+1)".into(),
             generated_by: ProblemSource::Template,
+            attribution: None,
         };
         store.save_problem(&problem).await.unwrap();
         assert_eq!(store.get_problem(problem.id).await.unwrap().unwrap(), problem);
