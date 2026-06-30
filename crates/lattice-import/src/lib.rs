@@ -22,11 +22,16 @@
 //! [`lattice_core::answers_match`]) rather than a CAS; SymPy-grade symbolic
 //! checking (§10.4) is the stronger deterministic follow-up.
 
+pub mod lesson;
 pub mod pipeline;
 pub mod source;
 pub mod tag;
 pub mod verify;
 
+pub use lesson::{
+    compose_lesson_file, generate_grounded_lesson, parse_license, run_lesson_import,
+    LessonReport, LessonSource, LocalGroundingSource, RawLesson,
+};
 pub use pipeline::{merge_into_problems_json, run_import, ImportReport, ImportedProblem};
 pub use source::{License, MathDatasetSource, ProblemSource, RawProblem};
 pub use tag::{difficulty_from_hint_tags, structure_and_tag, ConceptVocab, TagOutcome, TaggedProblem};

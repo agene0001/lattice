@@ -21,3 +21,7 @@ tokio = { workspace = true }
 [[bin]]
 name = "lattice-import"
 path = "src/bin/import.rs"
+
+[[bin]]
+name = "lattice-import-lessons"
+path = "src/bin/import_lessons.rs"
