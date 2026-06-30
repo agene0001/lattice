@@ -107,4 +107,35 @@
     border: 1px solid var(--border);
     padding: 0.4rem 0.7rem;
   }
+  /* Check-yourself reveals (<details>/<summary>) */
+  .lesson-body :global(details) {
+    margin: 0.5rem 0;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--panel-2);
+    padding: 0.1rem 0.9rem;
+  }
+  .lesson-body :global(details[open]) {
+    background: rgba(76, 141, 255, 0.06);
+    border-color: rgba(76, 141, 255, 0.35);
+  }
+  .lesson-body :global(summary) {
+    cursor: pointer;
+    padding: 0.55rem 0;
+    font-weight: 600;
+    list-style: none;
+  }
+  .lesson-body :global(summary::before) {
+    content: '▸ ';
+    color: var(--accent);
+  }
+  .lesson-body :global(details[open] summary::before) {
+    content: '▾ ';
+  }
+  .lesson-body :global(summary::-webkit-details-marker) {
+    display: none;
+  }
+  .lesson-body :global(details > p) {
+    margin: 0.2rem 0 0.7rem;
+  }
 </style>

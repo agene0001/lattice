@@ -65,6 +65,12 @@ pub enum TemplateKind {
         red_range: [i64; 2],
         blue_range: [i64; 2],
     },
+    /// `P(not red)` for a bag of red/blue marbles — the complement rule, as a
+    /// reduced fraction. A second *form* for probability basics.
+    ComplementProbability {
+        red_range: [i64; 2],
+        blue_range: [i64; 2],
+    },
     /// `E[X]` for a 3-value uniform random variable. Statistics.
     ExpectationUniform {
         mean_range: [i64; 2],
@@ -98,6 +104,12 @@ pub enum TemplateKind {
     },
     /// Gradient of `a·x² + b·y²` at a point. Toward gradient descent.
     Gradient {
+        coeff_range: [i64; 2],
+        point_range: [i64; 2],
+    },
+    /// Gradient of `a·x² + b·y² + c·z²` at a point — the three-variable form, a
+    /// harder tier for gradients.
+    Gradient3Var {
         coeff_range: [i64; 2],
         point_range: [i64; 2],
     },
@@ -181,6 +193,10 @@ impl TemplateKind {
                 red_range,
                 blue_range,
             } => SimpleProbability::sample(rng, red_range, blue_range).render(),
+            TemplateKind::ComplementProbability {
+                red_range,
+                blue_range,
+            } => ComplementProbability::sample(rng, red_range, blue_range).render(),
             TemplateKind::ExpectationUniform {
                 mean_range,
                 spread_range,
@@ -212,6 +228,10 @@ impl TemplateKind {
                 coeff_range,
                 point_range,
             } => Gradient::sample(rng, coeff_range, point_range).render(),
+            TemplateKind::Gradient3Var {
+                coeff_range,
+                point_range,
+            } => Gradient3Var::sample(rng, coeff_range, point_range).render(),
             TemplateKind::FunctionEval {
                 a_range,
                 b_range,
@@ -490,6 +510,39 @@ impl SimpleProbability {
         Instance {
             content: format!(
                 "\\text{{A bag holds }} {r} \\text{{ red and }} {b} \\text{{ blue marbles. }} P(\\text{{red}}) = \\;?",
+                r = self.red,
+                b = self.blue
+            ),
+            solution: format!("{p}/{q}"),
+        }
+    }
+}
+
+struct ComplementProbability {
+    red: i64,
+    blue: i64,
+}
+
+impl ComplementProbability {
+    fn sample(rng: &mut impl Rng, red_range: &[i64; 2], blue_range: &[i64; 2]) -> Self {
+        Self {
+            red: sample_in(rng, red_range).max(1),
+            blue: sample_in(rng, blue_range).max(1),
+        }
+    }
+
+    /// `P(not red) = blue / total`, reduced.
+    fn fraction(&self) -> (i64, i64) {
+        let total = self.red + self.blue;
+        let g = gcd(self.blue, total);
+        (self.blue / g, total / g)
+    }
+
+    fn render(&self) -> Instance {
+        let (p, q) = self.fraction();
+        Instance {
+            content: format!(
+                "\\text{{A bag holds }} {r} \\text{{ red and }} {b} \\text{{ blue marbles. }} P(\\text{{not red}}) = \\;?",
                 r = self.red,
                 b = self.blue
             ),
@@ -787,6 +840,48 @@ impl Gradient {
                 b = self.b,
                 x0 = self.x0,
                 y0 = self.y0
+            ),
+            solution: components(&self.grad()),
+        }
+    }
+}
+
+struct Gradient3Var {
+    a: i64,
+    b: i64,
+    c: i64,
+    x0: i64,
+    y0: i64,
+    z0: i64,
+}
+
+impl Gradient3Var {
+    fn sample(rng: &mut impl Rng, coeff_range: &[i64; 2], point_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_nonzero(rng, coeff_range),
+            b: sample_nonzero(rng, coeff_range),
+            c: sample_nonzero(rng, coeff_range),
+            x0: sample_in(rng, point_range),
+            y0: sample_in(rng, point_range),
+            z0: sample_in(rng, point_range),
+        }
+    }
+
+    /// ∇(a·x² + b·y² + c·z²) = (2a·x, 2b·y, 2c·z), evaluated at the point.
+    fn grad(&self) -> [i64; 3] {
+        [2 * self.a * self.x0, 2 * self.b * self.y0, 2 * self.c * self.z0]
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "f(x,y,z) = {a}x^2 + {b}y^2 + {c}z^2. \\quad \\nabla f \\text{{ at }} ({x0}, {y0}, {z0}) = \\;?",
+                a = self.a,
+                b = self.b,
+                c = self.c,
+                x0 = self.x0,
+                y0 = self.y0,
+                z0 = self.z0
             ),
             solution: components(&self.grad()),
         }
@@ -1305,6 +1400,32 @@ mod tests {
             assert!(p >= 1 && q > p, "{p}/{q}");
             assert_eq!(gcd(p, q), 1, "{p}/{q} not reduced");
             assert_eq!(p * (inst.red + inst.blue), q * inst.red);
+        }
+    }
+
+    #[test]
+    fn complement_probability_is_reduced_and_consistent() {
+        let mut r = rng();
+        for _ in 0..1000 {
+            let inst = ComplementProbability::sample(&mut r, &[1, 9], &[1, 9]);
+            let (p, q) = inst.fraction();
+            // P(not red) = blue/total, reduced, and P(red) + P(not red) = 1.
+            assert_eq!(gcd(p, q), 1, "{p}/{q} not reduced");
+            assert_eq!(p * (inst.red + inst.blue), q * inst.blue);
+            assert!(p <= q, "a probability must be ≤ 1");
+        }
+    }
+
+    #[test]
+    fn gradient3var_doubles_each_coefficient() {
+        let mut r = rng();
+        for _ in 0..1000 {
+            let inst = Gradient3Var::sample(&mut r, &[2, 5], &[-3, 3]);
+            assert!(inst.a != 0 && inst.b != 0 && inst.c != 0);
+            assert_eq!(
+                inst.grad(),
+                [2 * inst.a * inst.x0, 2 * inst.b * inst.y0, 2 * inst.c * inst.z0]
+            );
         }
     }
 

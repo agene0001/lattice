@@ -24,6 +24,7 @@ use lattice_graph::{
     MasteryModel, WeakLink,
 };
 use lattice_storage::{SqliteStorage, Storage, StorageError};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, thiserror::Error)]
@@ -457,23 +458,30 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
         self.subject.templates.first().map(|t| &t.concept)
     }
 
-    fn pick_template(&self, concept: &ConceptId) -> Option<Template> {
+    /// All templates that drill `concept`, in authored order. A concept can have
+    /// several — different difficulty tiers and different problem *forms* — and
+    /// [`generate_for`](Self::generate_for) picks among them at random so repeated
+    /// practice varies instead of serving the same form every time.
+    fn templates_for(&self, concept: &ConceptId) -> Vec<&Template> {
         self.subject
             .templates
             .iter()
-            .find(|t| &t.concept == concept)
-            .cloned()
+            .filter(|t| &t.concept == concept)
+            .collect()
     }
 
     /// Generate + persist a problem for `concept`, or `None` if it has no
-    /// template. The RNG is created and dropped inside the sync block so the
-    /// returned future stays `Send`.
+    /// template. When several templates target the concept, one is chosen
+    /// uniformly at random for variety. The RNG is created and dropped inside the
+    /// sync block so the returned future stays `Send`.
     async fn generate_for(&self, concept: &ConceptId) -> Result<Option<Problem>, ServiceError> {
-        let Some(template) = self.pick_template(concept) else {
+        let templates = self.templates_for(concept);
+        if templates.is_empty() {
             return Ok(None);
-        };
+        }
         let problem = {
             let mut rng = rand::rng();
+            let template = templates[rng.random_range(0..templates.len())];
             template.generate(&self.subject.id, &mut rng)
         };
         self.storage.save_problem(&problem).await?;
