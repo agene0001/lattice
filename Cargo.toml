@@ -21,6 +21,7 @@ lattice-storage = { path = "crates/lattice-storage" }
 lattice-service = { path = "crates/lattice-service" }
 lattice-diagnosis = { path = "crates/lattice-diagnosis" }
 lattice-llm = { path = "crates/lattice-llm" }
+lattice-import = { path = "crates/lattice-import" }
 
 # Third-party
 serde = { version = "1", features = ["derive"] }

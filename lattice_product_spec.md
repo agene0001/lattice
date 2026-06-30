@@ -334,7 +334,137 @@ Same underlying discipline as the language platform:
 
 ---
 
-## 10. Relationship to Glossa (the language platform)
+## 10. Content Import Pipeline (`lattice-import`)
+
+The biggest practical bottleneck in getting Lattice usable is **populating problems and lessons at scale across many math disciplines**. LLM-generating content from scratch does not scale and carries an unacceptable correctness risk for math (a confidently-generated problem with no clean solution, or a wrong answer key, is exactly the failure mode §12.5 already flags). The right model is to **ingest existing problems and use the LLM to structure and tag them**, not author them.
+
+### 10.1 The Core Reframe — LLM as Structurer, Not Author
+
+The LLM's job in import is a closed-vocabulary classification/extraction task, not open generation:
+
+```
+RawProblem (text + solution, from some source)
+  → LLM: structure into Problem { content, solution, difficulty }
+         + tag with concept_ids drawn from the EXISTING concept graph
+  → CAS verification (does the stated solution actually check out?)
+  → store with provenance (source, license)
+```
+
+This is the same machinery as Pillar 4 misconception diagnosis (§2.4): structured JSON output, constrained to a fixed concept set. It is reliable in a way authoring is not, because the model is mapping existing content onto a known taxonomy rather than inventing both the content and its correctness.
+
+### 10.2 Source Adapters
+
+Same pluggable-trait pattern used elsewhere in the architecture (`TrendSource`, `GameSource`, subject plugins):
+
+```rust
+pub struct RawProblem {
+    pub content: String,        // LaTeX or plain text, as found
+    pub solution: Option<String>,
+    pub source_label: String,   // dataset name, textbook title, URL
+    pub license: License,       // tracked from ingestion — see 10.6
+    pub hint_tags: Vec<String>, // any pre-existing subject/difficulty labels from the source
+}
+
+pub trait ProblemSource {
+    async fn fetch(&self) -> Result<Vec<RawProblem>>;
+}
+```
+
+`MathDatasetSource`, `OpenStaxSource`, `OcrSource` are all adapters; the structuring → verification → provenance pipeline downstream is shared and source-agnostic.
+
+### 10.3 Sources, Ordered by What to Build First
+
+**Tier 1 — pre-structured open datasets (no OCR, build first).** These are JSON/CSV with LaTeX already present; many are pre-tagged, so a chunk of the concept mapping is already done:
+
+- **MATH dataset** (Hendrycks et al.) — ~12,500 competition problems with step-by-step solutions, already tagged by subject (Algebra, Number Theory, Geometry, Counting & Probability, Precalculus, etc.) and difficulty level 1–5. The single highest-leverage import: its own subject/level labels seed the `hint_tags` → concept-graph mapping, and it gives thousands of problems to validate the whole graph/diagnosis loop against immediately.
+- **GSM8K** — 8.5K grade-school word problems with multi-step solutions, MIT licensed. Relevant if the K-12 vertical (§12.1) is pursued.
+- **OpenMathInstruct-1** — 1.8M problem-solution pairs, commercially permissive license. More than needed, but clean.
+- **OpenStax** — full CC-BY math textbooks (Algebra, Precalc, Calculus, Statistics) with exercises. This is also the best source for *lesson prose*, not just problems — relevant for the lesson side of content, not only the problem bank. Attribution required, redistributable.
+
+**Tier 2 — OCR path (arbitrary textbooks / blogs, build last).** Only needed for sources not already in structured form. Math-aware OCR is required — general OCR butchers equations:
+
+- **Surya** (`surya_latex_ocr`) — current open-source pick, handles images or PDFs, runs locally (CPU/GPU/MPS). Absorbed and improved on the older `texify` model. Better than pix2tex (block-equations only, hallucinates on text) and Nougat (whole-page, hallucinates on small math-only images).
+- **Mathpix OCR API** — paid, highest accuracy on difficult notation. Worth it only if Surya's accuracy on gnarly notation becomes the blocker. (Large academic pipelines have migrated Nougat → Mathpix specifically for reliability.)
+
+Recommended order: MATH first (pre-tagged, immediate scale), OpenStax for lessons, OCR last once the pipeline is proven.
+
+### 10.4 Verification
+
+Every imported problem runs through a CAS check before being marked usable:
+
+- **SymPy** can confirm a stated solution actually satisfies the problem for a large fraction of algebra/calculus content, and flags what it can't verify for manual review (rather than silently trusting it).
+- This is the **same symbolic/numeric-equivalence machinery** §12.6 already requires for the answer-leak guardrail — build it once, use it for both import verification and tutor-response checking.
+- Problems that fail or can't be auto-verified are stored with `verified = false` and excluded from the active practice pool until reviewed, rather than discarded.
+
+### 10.5 Lessons (vs. Problems)
+
+Lessons — expository prose teaching a concept — are a different import problem from problems, in two ways that push *away* from direct copying:
+
+- **Copyright is worse for prose.** A routine exercise is close to functional/factual content; a textbook's *explanation* is the author's creative expression — the most copyrightable thing in the book. Converting a copyrighted chapter to markdown and bundling it for others is far more exposed than the equivalent for problems.
+- **No CAS verification.** Prose has no machine-checkable correctness. The failure mode is also softer (an awkward explanation is still useful; a problem with no valid solution is a hard fail). What's worth checking in generated prose is narrow and factual: definitions and theorem conditions, not the overall exposition.
+
+Because of this, lessons lean on generation more than import. Three lanes, in priority order:
+
+**Lane A — grounded generation (default).** Not cold generation. Feed the LLM an openly-licensed source passage (e.g. an OpenStax section) as grounding context, plus the concept-graph node, target level, and the standard markdown format, and have it produce the lesson *from* that source. This is RAG-flavored: far more accurate than cold generation because the model restructures grounded material rather than recalling from nothing; output is in the platform's own voice/format; and it's clean to redistribute (a derivative of open-licensed material, attribution only). Add a light review pass targeted specifically at definitions/theorem statements. This is the right default for V1.
+
+**Lane B — direct import of openly-licensed lessons.** OpenStax and LibreTexts chapters *are* lessons, CC-licensed and redistributable with attribution. Where polished existing exposition is preferred over generated, convert those to markdown and use directly.
+
+**Lane C — convert arbitrary textbook/blog → markdown.** Technically very doable; sorts by document type:
+- *PDF chapters:* try **PyMuPDF4LLM** first for native (selectable-text) PDFs — no ML models, CPU-only, fastest. Fall back to **Marker** (all-rounder: PDF/DOCX/HTML/EPUB → markdown, Surya-based OCR, optional `--use_llm` for messy layouts) when quality isn't there. Use **MinerU** when the math is dense/multi-column (high formula recognition, LaTeX-friendly, wants a GPU). Note **Marker's model weights carry commercial-use licensing restrictions** — fine for personal/dev use, check before any distributed build.
+- *Blogs/HTML:* much easier than PDF — the math is usually already LaTeX in the page source (MathJax/KaTeX), so it's structure extraction, not OCR. **Pandoc**, **MarkItDown**, or **Jina Reader** (URL→markdown) all work.
+
+The catch on Lane C: for *copyrighted* sources the output is personal-use-only. In practice, use it to build personal reference material and to produce **grounding input for Lane A** — not as a content source for a distributed build.
+
+Pipeline-wise this is a `LessonSource` trait paralleling `ProblemSource`, sharing the same provenance/license tracking, but the verification leg is a lightweight definition/theorem review pass rather than a CAS check:
+
+```rust
+pub struct RawLesson {
+    pub markdown: String,
+    pub concept_id: Option<ConceptId>,  // may be assigned at tag time rather than ingest
+    pub source_label: String,
+    pub license: License,
+}
+
+pub trait LessonSource {
+    async fn fetch(&self) -> Result<Vec<RawLesson>>;
+}
+```
+
+**Design note:** lessons are lower-stakes in Lattice than in a conventional course platform — §2.2 treats explicit explanation as opt-in support, not the main event. The core product is concept-graph + problems + diagnosis. Don't over-engineer the lesson pipeline; grounded generation (Lane A) is sufficient for V1, and effort is better spent on the problem bank and diagnosis loop.
+
+### 10.6 Provenance & License Tracking (do this from day one)
+
+The relevant fork is **personal-use vs. distributed-to-others**, not free vs. paid. Giving the platform away free or open-source does *not* remove this concern — redistributing copyrighted textbook/blog prose in a public repo is still infringement regardless of price, and arguably more exposed since the content becomes publicly mirrorable. What makes a future open-source release clean is that the *bundled content is itself openly licensed*, not that the software is free.
+
+- Every `Problem` and `Lesson` carries `source` and `license` fields from first ingestion.
+- For V1 (a single-user personal tool, §2), pulling problems or prose from a textbook you own or a blog for your own private study is a normal, defensible use.
+- For any future release distributed to other people (free, open-source, or paid alike), the bundled content set must be filtered to openly-licensed sources only (OpenStax, LibreTexts, MATH, GSM8K, OpenMathInstruct). If `license` is a column from day one, that's a `WHERE` clause at release time rather than a re-import of everything. Lane-A grounded generation also helps here: a lesson generated from CC-BY grounding is redistributable in a way a converted copyrighted chapter is not.
+- *Not legal advice — the eventual distribution question warrants a real opinion at that stage, not an assumption.*
+
+### 10.7 Schema Additions
+
+```sql
+-- extends problems table from §6
+ALTER TABLE problems ADD COLUMN source TEXT;          -- dataset name / textbook / URL
+ALTER TABLE problems ADD COLUMN license TEXT;         -- 'CC-BY' | 'MIT' | 'copyrighted-personal' | ...
+ALTER TABLE problems ADD COLUMN verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE problems ADD COLUMN import_hint_tags JSONB; -- raw source labels, pre-concept-mapping
+
+-- lessons (new table — expository content keyed to a concept node)
+lessons(id, concept_id, subject_id, markdown, source, license, generated_by, reviewed, created_at)
+-- generated_by: 'grounded-llm' | 'imported' | 'hand-written'
+-- reviewed: definition/theorem review pass complete (the prose analogue of `verified`)
+```
+
+`generated_by` on `problems` (§6) gains a third value beyond `'template' | 'ai'`: `'imported'`.
+
+### 10.8 Where This Sits in the Roadmap
+
+Slots into **Phase 1**, alongside the deterministic core — the concept graph and diagnosis loop are far easier to validate against thousands of real imported problems than against a handful of hand-written ones. Tier 1 (dataset import) is Phase 1; Tier 2 (OCR) and the Lane-C conversion path can wait until the pipeline is proven, since they add the most complexity for the least immediate volume. Lesson generation (Lane A) is Phase 1; lesson import lanes (B/C) follow as needed.
+
+---
+
+## 11. Relationship to Glossa (the language platform)
 
 Worth naming explicitly since both specs share the same conceptual shape: a continuously updated learner model driving dynamically generated content, rather than a fixed curriculum. The source material for this platform calls that out directly as "Learn Anything" — one engine, subjects as plugins.
 
@@ -342,7 +472,7 @@ Recommendation for now: **keep them separate codebases**, not a shared crate fro
 
 ---
 
-## 11. Open Questions
+## 12. Open Questions
 
 1. **Starting scope within math** — K-12 math (larger market, "parents pay" per the source material), or your own current coursework (calc/linear algebra/stats, given your ML work) as the initial concept graph? The latter doubles as dogfooding, same as the language platform being scoped to a single learner = you.
 2. **Submitted-work capture format** — free text, structured step-by-step input, or photo/OCR of handwritten work? This materially affects how good Pillar 4's diagnosis can be and is a real UI design decision, not a backend detail.

@@ -1896,6 +1896,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lattice-import"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "lattice-content",
+ "lattice-core",
+ "lattice-llm",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "lattice-llm"
 version = "0.1.0"
 dependencies = [
