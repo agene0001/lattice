@@ -387,6 +387,17 @@ button.ghost {
 .chip.cross {
   border-color: rgba(111, 92, 255, 0.5);
 }
+.cross-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.6rem 0;
+}
+.cross-links .diagnosis {
+  flex-basis: 100%;
+  margin: 0 0 0.2rem;
+}
 .chip.cross .cross-subj {
   color: var(--accent-2);
   font-size: 0.9em;

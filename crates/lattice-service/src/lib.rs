@@ -62,6 +62,11 @@ pub struct AttemptOutcome {
     pub weak_link: Option<WeakLink>,
     /// A freshly generated practice problem targeting the weak link.
     pub practice: Option<Problem>,
+    /// Cross-subject prerequisites of the failed concept (e.g. the Math nodes a
+    /// Physics concept builds on). The orchestration layer resolves each one's
+    /// mastery in its own subject to decide which are worth surfacing.
+    #[serde(default)]
+    pub external_prerequisites: Vec<ConceptRef>,
 }
 
 /// One concept's status for the graph view (spec §5, frontend `Graph`).
@@ -311,8 +316,8 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
             self.storage.upsert_mastery(learner, &updated).await?;
         }
 
-        let (weak_link, practice) = if is_correct {
-            (None, None)
+        let (weak_link, practice, external_prerequisites) = if is_correct {
+            (None, None, Vec::new())
         } else {
             let weak =
                 find_weakest_prerequisite(&self.graph, &problem, &masteries, &self.model, now);
@@ -320,7 +325,19 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
                 Some(w) => self.generate_for(&w.concept_id).await?,
                 None => None,
             };
-            (weak, practice)
+            // Cross-subject prerequisites of the failed concept(s), for the
+            // orchestration layer to weigh against other subjects' mastery.
+            let mut external = Vec::new();
+            for concept in &problem.concepts {
+                if let Some(c) = self.graph.get(concept) {
+                    for r in &c.external_prerequisites {
+                        if !external.contains(r) {
+                            external.push(r.clone());
+                        }
+                    }
+                }
+            }
+            (weak, practice, external)
         };
 
         Ok(AttemptOutcome {
@@ -328,7 +345,24 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
             is_correct,
             weak_link,
             practice,
+            external_prerequisites,
         })
+    }
+
+    /// The learner's current (decay-adjusted) mastery of one concept, or `None`
+    /// if never practiced. Used by the orchestration layer to weigh a
+    /// cross-subject prerequisite that lives in this subject.
+    pub async fn concept_mastery(
+        &self,
+        learner: LearnerId,
+        concept: &ConceptId,
+    ) -> Result<Option<f32>, ServiceError> {
+        self.storage.ensure_learner(learner).await?;
+        let masteries = self.storage.load_mastery(learner).await?;
+        let now = Utc::now();
+        Ok(masteries
+            .get(concept)
+            .map(|m| self.model.estimated_mastery(m, now)))
     }
 
     /// The whole concept graph annotated with the learner's current mastery —

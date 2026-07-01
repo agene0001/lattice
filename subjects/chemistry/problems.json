@@ -1,0 +1,37 @@
+{
+  "_comment": "Chemistry uses \\ce{} (mhchem) in content for formulas/equations. Molar-mass answers carry g/mol and are graded by the units-aware answers_match.",
+  "problems": [
+    {
+      "id": "chem_mm_water",
+      "concept": "molar_mass",
+      "difficulty": "easy",
+      "content": "\\text{What is the molar mass of } \\ce{H2O}? \\quad (\\text{H} = 1,\\ \\text{O} = 16)",
+      "solution": "18 g/mol",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "chem_mm_co2",
+      "concept": "molar_mass",
+      "difficulty": "easy",
+      "content": "\\text{What is the molar mass of } \\ce{CO2}? \\quad (\\text{C} = 12,\\ \\text{O} = 16)",
+      "solution": "44 g/mol",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "chem_moles_water",
+      "concept": "moles",
+      "difficulty": "medium",
+      "content": "\\text{How many moles are in } 36\\,\\text{g of } \\ce{H2O}? \\quad (M = 18\\,\\text{g/mol})",
+      "solution": "2 mol",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "chem_balance_water",
+      "concept": "balancing_equations",
+      "difficulty": "medium",
+      "content": "\\text{Balance } \\ce{H2 + O2 -> H2O}. \\text{ Give the coefficients of } \\ce{H2}, \\ce{O2}, \\ce{H2O}.",
+      "solution": "2, 1, 2",
+      "source": "Authored for Lattice"
+    }
+  ]
+}

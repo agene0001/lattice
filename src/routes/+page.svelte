@@ -601,6 +601,25 @@
                 </p>
               {/if}
 
+              {#if outcome.cross_weak_links?.length}
+                <div class="cross-links">
+                  <p class="diagnosis">
+                    This also builds on skills in another subject that look shaky —
+                    the root cause may be there:
+                  </p>
+                  {#each outcome.cross_weak_links as l}
+                    <button
+                      class="chip clickable small cross"
+                      onclick={() => crossPractice(l)}
+                      title="Practise in {l.subject_name}"
+                    >
+                      {l.label}
+                      <span class="cross-subj">↗ {l.subject_name} · {pct(l.mastery)}%</span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+
               {#if diagnosis}
                 <div class="ai-diagnosis">
                   <div class="ai-head">

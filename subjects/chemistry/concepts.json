@@ -1,0 +1,17 @@
+{
+  "subject": {
+    "id": "chemistry",
+    "name": "Chemistry"
+  },
+  "groups": ["Foundations", "Stoichiometry"],
+  "concepts": [
+    { "id": "chemical_formulas", "label": "Chemical Formulas", "group": "Foundations", "prerequisites": [],
+      "description": "Reading formulas: elements, subscripts, counting atoms." },
+    { "id": "balancing_equations", "label": "Balancing Equations", "group": "Foundations", "prerequisites": ["chemical_formulas"],
+      "description": "Conservation of mass: same atoms on both sides." },
+    { "id": "moles", "label": "The Mole", "group": "Stoichiometry", "prerequisites": ["chemical_formulas", "math:arithmetic"],
+      "description": "Avogadro's number; counting particles by weighing." },
+    { "id": "molar_mass", "label": "Molar Mass", "group": "Stoichiometry", "prerequisites": ["moles", "math:arithmetic"],
+      "description": "Grams per mole from a formula." }
+  ]
+}

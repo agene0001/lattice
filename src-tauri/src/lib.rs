@@ -153,17 +153,73 @@ async fn next_problem(state: State<'_, AppState>) -> Result<Problem, String> {
         .map_err(to_message)
 }
 
+/// A cross-subject prerequisite that looks weak — surfaced after a wrong answer
+/// so a failed Physics problem can point at the shaky Math skill underneath.
+#[derive(Serialize)]
+struct CrossWeakLink {
+    subject_id: String,
+    subject_name: String,
+    concept_id: String,
+    label: String,
+    mastery: f32,
+    practiceable: bool,
+}
+
+/// The attempt outcome plus any weak cross-subject prerequisites (resolved across
+/// the whole subject registry — a single per-subject service can't see them).
+#[derive(Serialize)]
+struct SubmitView {
+    #[serde(flatten)]
+    outcome: AttemptOutcome,
+    cross_weak_links: Vec<CrossWeakLink>,
+}
+
+/// Below this mastery, a cross-subject prerequisite is worth flagging.
+const CROSS_WEAK_THRESHOLD: f32 = 0.6;
+
 #[tauri::command]
 async fn submit_attempt(
     state: State<'_, AppState>,
     problem_id: ProblemId,
     submitted_work: String,
-) -> Result<AttemptOutcome, String> {
-    state
+) -> Result<SubmitView, String> {
+    let outcome = state
         .active_service()?
         .submit_attempt(state.learner, problem_id, submitted_work)
         .await
-        .map_err(to_message)
+        .map_err(to_message)?;
+
+    // For each cross-subject prerequisite of the failed concept, check the
+    // learner's mastery *in that subject* and surface the weak ones.
+    let mut cross_weak_links = Vec::new();
+    for r in &outcome.external_prerequisites {
+        let Some(service) = state.subjects.get(r.subject.as_str()) else {
+            continue;
+        };
+        let Some((label, practiceable)) = service.concept_brief(&r.concept) else {
+            continue;
+        };
+        let mastery = service
+            .concept_mastery(state.learner, &r.concept)
+            .await
+            .map_err(to_message)?
+            .unwrap_or(0.0);
+        if mastery < CROSS_WEAK_THRESHOLD {
+            cross_weak_links.push(CrossWeakLink {
+                subject_id: r.subject.to_string(),
+                subject_name: service.subject_name().to_string(),
+                concept_id: r.concept.to_string(),
+                label,
+                mastery,
+                practiceable,
+            });
+        }
+    }
+
+    Ok(SubmitView {
+        outcome,
+        cross_weak_links,
+    })
 }
 
 #[tauri::command]

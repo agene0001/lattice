@@ -1,5 +1,7 @@
 <script>
   import katex from 'katex';
+  // mhchem extension: enables \ce{...} / \pu{...} for chemical equations & units.
+  import 'katex/contrib/mhchem';
 
   let { tex = '', display = false } = $props();
 

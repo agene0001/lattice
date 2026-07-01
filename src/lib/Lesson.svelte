@@ -1,6 +1,8 @@
 <script>
   import { marked } from 'marked';
   import katex from 'katex';
+  // mhchem extension: enables \ce{...} chemical notation inside lessons.
+  import 'katex/contrib/mhchem';
 
   let { source = '' } = $props();
 
@@ -112,6 +114,23 @@
   }
   .lesson-body :global(a) {
     color: var(--accent);
+  }
+  /* Diagrams: images (from static/) and inline SVG (free-body, circuits, …). */
+  .lesson-body :global(img),
+  .lesson-body :global(svg) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1rem auto;
+  }
+  .lesson-body :global(figure) {
+    margin: 1rem 0;
+    text-align: center;
+  }
+  .lesson-body :global(figcaption) {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 0.35rem;
   }
   .lesson-body :global(table) {
     border-collapse: collapse;
