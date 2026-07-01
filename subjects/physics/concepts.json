@@ -1,0 +1,21 @@
+{
+  "subject": {
+    "id": "physics",
+    "name": "Physics"
+  },
+  "groups": ["Kinematics", "Dynamics"],
+  "concepts": [
+    { "id": "units_dimensions", "label": "Units & Dimensions", "group": "Kinematics", "prerequisites": [],
+      "description": "SI units, dimensional analysis, unit conversion." },
+    { "id": "velocity", "label": "Velocity", "group": "Kinematics", "prerequisites": ["units_dimensions"],
+      "description": "Displacement over time; speed and direction." },
+    { "id": "acceleration", "label": "Acceleration", "group": "Kinematics", "prerequisites": ["velocity"],
+      "description": "Rate of change of velocity." },
+    { "id": "kinematics_equations", "label": "Kinematic Equations", "group": "Kinematics", "prerequisites": ["acceleration"],
+      "description": "Constant-acceleration motion: v = u + at and friends." },
+    { "id": "newtons_second_law", "label": "Newton's Second Law", "group": "Dynamics", "prerequisites": ["acceleration"],
+      "description": "F = ma; net force causes acceleration." },
+    { "id": "weight", "label": "Weight", "group": "Dynamics", "prerequisites": ["newtons_second_law"],
+      "description": "The gravitational force on a mass, W = mg." }
+  ]
+}

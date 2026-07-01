@@ -1,0 +1,53 @@
+{
+  "_comment": "Physics answers carry units — graded by lattice-core's units-aware answers_match (value + dimension). '5 m/s^2' == '5 m/s²' == '5 m/s/s'; '6 N' != '6 J'.",
+  "problems": [
+    {
+      "id": "phys_convert_km",
+      "concept": "units_dimensions",
+      "difficulty": "easy",
+      "content": "\\text{Convert } 2\\,\\text{km to metres.}",
+      "solution": "2000 m",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "phys_avg_speed",
+      "concept": "velocity",
+      "difficulty": "easy",
+      "content": "\\text{A car travels } 100\\,\\text{m in } 5\\,\\text{s. What is its average speed?}",
+      "solution": "20 m/s",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "phys_acceleration",
+      "concept": "acceleration",
+      "difficulty": "easy",
+      "content": "\\text{A runner speeds up from } 0 \\text{ to } 30\\,\\text{m/s in } 6\\,\\text{s. What is the acceleration?}",
+      "solution": "5 m/s^2",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "phys_free_fall",
+      "concept": "kinematics_equations",
+      "difficulty": "medium",
+      "content": "\\text{An object is dropped from rest } (g = 9.8\\,\\text{m/s}^2). \\text{ How fast is it moving after } 2\\,\\text{s?}",
+      "solution": "19.6 m/s",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "phys_second_law",
+      "concept": "newtons_second_law",
+      "difficulty": "easy",
+      "content": "\\text{A net force accelerates a } 2\\,\\text{kg mass at } 3\\,\\text{m/s}^2. \\text{ What is the force?}",
+      "solution": "6 N",
+      "source": "Authored for Lattice"
+    },
+    {
+      "id": "phys_weight",
+      "concept": "weight",
+      "difficulty": "easy",
+      "content": "\\text{What is the weight of a } 10\\,\\text{kg object } (g = 9.8\\,\\text{m/s}^2)?",
+      "solution": "98 N",
+      "source": "Authored for Lattice"
+    }
+  ]
+}

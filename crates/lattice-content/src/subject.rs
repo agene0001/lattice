@@ -279,6 +279,47 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
+    /// Every authored subject under `subjects/` must load, be a valid DAG, and
+    /// have every template + curated problem point at a real concept. This guards
+    /// all subjects at once (math, physics, and any added later) against typos.
+    #[test]
+    fn all_authored_subjects_are_valid() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../subjects");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(&root).expect("subjects dir") {
+            let dir = entry.unwrap().path();
+            if !dir.join("concepts.json").is_file() {
+                continue;
+            }
+            let subject = load_subject(&dir)
+                .unwrap_or_else(|e| panic!("loading {}: {e}", dir.display()));
+            let graph = lattice_graph::ConceptGraph::new(subject.concepts.clone());
+            graph
+                .validate()
+                .unwrap_or_else(|e| panic!("{} is not a valid DAG: {e}", dir.display()));
+            for t in &subject.templates {
+                assert!(
+                    graph.get(&t.concept).is_some(),
+                    "{}: template `{}` targets unknown concept `{}`",
+                    dir.display(),
+                    t.id,
+                    t.concept
+                );
+            }
+            for p in &subject.static_problems {
+                assert!(
+                    graph.get(&p.concept).is_some(),
+                    "{}: problem `{}` targets unknown concept `{}`",
+                    dir.display(),
+                    p.id,
+                    p.concept
+                );
+            }
+            checked += 1;
+        }
+        assert!(checked >= 2, "expected at least math + physics subjects");
+    }
+
     /// Every template must target a concept that actually exists in the graph.
     #[test]
     fn every_template_targets_a_real_concept() {

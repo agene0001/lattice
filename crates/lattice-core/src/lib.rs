@@ -11,6 +11,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+pub mod units;
+
 /// Human-readable identifier for a concept node, e.g. `"difference_of_squares"`.
 ///
 /// Concepts are hand-authored in subject data files, so their ids are stable
@@ -247,14 +249,32 @@ pub struct Diagnosis {
 /// Whether `candidate` answers a problem whose expected answer is `expected`.
 ///
 /// Numeric/fraction answers compare by value (`1/2` = `2/4` = `0.5`, and
-/// `x = 3` = `3`); everything else falls back to a normalized substring match.
-/// Shared by grading (`lattice-service`) and AI-generation verification
-/// (`lattice-content`) so both agree on what "equivalent" means (spec open Q6).
+/// `x = 3` = `3`); physical quantities compare by value **and** dimension
+/// (`9.8 m/s^2` = `9.80 m/s²`, but `5 J` ≠ `5 N`); everything else falls back to
+/// a normalized substring match. Shared by grading (`lattice-service`) and
+/// AI-generation verification (`lattice-content`) so both agree on what
+/// "equivalent" means (spec open Q6).
 pub fn answers_match(expected: &str, candidate: &str) -> bool {
     let expected_n = normalize_answer(expected);
     if expected_n.is_empty() {
         return false;
     }
+    // Units-aware first: when *both* sides carry a recognizable unit, compare as
+    // physical quantities. Unitless answers return `None` here and fall through
+    // to the numeric/substring logic below, so math grading is unchanged.
+    let expected_tail = expected.rsplit('=').next().unwrap_or(expected);
+    let candidate_tail = candidate
+        .lines()
+        .rev()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or(candidate);
+    if let (Some(want), Some(got)) = (
+        units::parse_quantity(expected_tail),
+        units::parse_quantity(candidate_tail),
+    ) {
+        return units::quantities_match(&want, &got, units::DEFAULT_REL_TOL);
+    }
+
     if let Some(want) = to_number(after_last_eq(&expected_n)) {
         // Numeric: compare the candidate's final number, not a substring.
         let last_line = candidate
@@ -328,5 +348,17 @@ mod tests {
         assert!(answers_match("(x - 1)(x + 1)", "(x-1)(x+1)"));
         assert!(answers_match("3, 5", "(3, 5)"));
         assert!(!answers_match("2x + 3", "2x + 5"));
+    }
+
+    #[test]
+    fn physical_quantities_compare_by_value_and_dimension() {
+        // Formatting / sig-figs / unicode don't matter; dimension does.
+        assert!(answers_match("9.8 m/s^2", "9.80 m/s²"));
+        assert!(answers_match("v = 20 m/s", "the speed is 20 m/s"));
+        assert!(answers_match("1 km", "1000 m"));
+        assert!(!answers_match("5 J", "5 N")); // right number, wrong dimension
+        assert!(!answers_match("9.8 m/s^2", "5 m/s^2")); // wrong value
+        // A unitless answer still uses the numeric path unchanged.
+        assert!(answers_match("x = 3", "3"));
     }
 }
