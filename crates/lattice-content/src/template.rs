@@ -135,6 +135,33 @@ pub enum TemplateKind {
     MleCoin { flips_range: [i64; 2] },
     /// Read off the i-th entry of an integer vector. Vectors (definitional).
     VectorComponent { dim: usize, value_range: [i64; 2] },
+
+    // --- Physics (answers carry units; graded by the units-aware `answers_match`) ---
+    /// Average speed = distance / time. Answer in `m/s`.
+    AverageSpeed {
+        speed_range: [i64; 2],
+        time_range: [i64; 2],
+    },
+    /// Acceleration from a standing start: a = Δv / t. Answer in `m/s^2`.
+    AccelerationFromSpeed {
+        accel_range: [i64; 2],
+        time_range: [i64; 2],
+    },
+    /// Final velocity under constant acceleration: v = u + a·t. Answer in `m/s`.
+    FinalVelocity {
+        u_range: [i64; 2],
+        a_range: [i64; 2],
+        t_range: [i64; 2],
+    },
+    /// Newton's second law: F = m·a. Answer in `N`.
+    NewtonSecondLaw {
+        mass_range: [i64; 2],
+        accel_range: [i64; 2],
+    },
+    /// Weight from mass: W = m·g with g = 9.8 m/s². Answer in `N`.
+    Weight { mass_range: [i64; 2] },
+    /// Unit conversion: kilometres to metres. Answer in `m`.
+    UnitConversion { value_range: [i64; 2] },
 }
 
 /// A rendered instance: the problem statement and its solution, both as LaTeX.
@@ -261,6 +288,27 @@ impl TemplateKind {
             }
             TemplateKind::VectorComponent { dim, value_range } => {
                 VectorComponent::sample(rng, *dim, value_range).render()
+            }
+            TemplateKind::AverageSpeed {
+                speed_range,
+                time_range,
+            } => AverageSpeed::sample(rng, speed_range, time_range).render(),
+            TemplateKind::AccelerationFromSpeed {
+                accel_range,
+                time_range,
+            } => AccelerationFromSpeed::sample(rng, accel_range, time_range).render(),
+            TemplateKind::FinalVelocity {
+                u_range,
+                a_range,
+                t_range,
+            } => FinalVelocity::sample(rng, u_range, a_range, t_range).render(),
+            TemplateKind::NewtonSecondLaw {
+                mass_range,
+                accel_range,
+            } => NewtonSecondLaw::sample(rng, mass_range, accel_range).render(),
+            TemplateKind::Weight { mass_range } => Weight::sample(rng, mass_range).render(),
+            TemplateKind::UnitConversion { value_range } => {
+                UnitConversion::sample(rng, value_range).render()
             }
         }
     }
@@ -1150,6 +1198,192 @@ impl VectorComponent {
     }
 }
 
+// --- Physics instances (answers include units) ---
+
+struct AverageSpeed {
+    speed: i64,
+    time: i64,
+}
+
+impl AverageSpeed {
+    fn sample(rng: &mut impl Rng, speed_range: &[i64; 2], time_range: &[i64; 2]) -> Self {
+        Self {
+            speed: sample_in(rng, speed_range).abs().max(1),
+            time: sample_in(rng, time_range).abs().max(1),
+        }
+    }
+
+    /// Distance is chosen as speed·time so the answer is exactly `speed`.
+    fn distance(&self) -> i64 {
+        self.speed * self.time
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{A car travels }} {d}\\,\\text{{m in }} {t}\\,\\text{{s. What is its average speed?}}",
+                d = self.distance(),
+                t = self.time
+            ),
+            solution: format!("{} m/s", self.speed),
+        }
+    }
+}
+
+struct AccelerationFromSpeed {
+    accel: i64,
+    time: i64,
+}
+
+impl AccelerationFromSpeed {
+    fn sample(rng: &mut impl Rng, accel_range: &[i64; 2], time_range: &[i64; 2]) -> Self {
+        Self {
+            accel: sample_in(rng, accel_range).abs().max(1),
+            time: sample_in(rng, time_range).abs().max(1),
+        }
+    }
+
+    fn delta_v(&self) -> i64 {
+        self.accel * self.time
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{A runner speeds up from rest to }} {dv}\\,\\text{{m/s in }} {t}\\,\\text{{s. What is the acceleration?}}",
+                dv = self.delta_v(),
+                t = self.time
+            ),
+            solution: format!("{} m/s^2", self.accel),
+        }
+    }
+}
+
+struct FinalVelocity {
+    u: i64,
+    a: i64,
+    t: i64,
+}
+
+impl FinalVelocity {
+    fn sample(rng: &mut impl Rng, u_range: &[i64; 2], a_range: &[i64; 2], t_range: &[i64; 2]) -> Self {
+        Self {
+            u: sample_in(rng, u_range).abs(),
+            a: sample_in(rng, a_range).abs().max(1),
+            t: sample_in(rng, t_range).abs().max(1),
+        }
+    }
+
+    fn final_v(&self) -> i64 {
+        self.u + self.a * self.t
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{An object moving at }} {u}\\,\\text{{m/s accelerates at }} {a}\\,\\text{{m/s}}^2 \\text{{ for }} {t}\\,\\text{{s. What is its final velocity?}}",
+                u = self.u,
+                a = self.a,
+                t = self.t
+            ),
+            solution: format!("{} m/s", self.final_v()),
+        }
+    }
+}
+
+struct NewtonSecondLaw {
+    mass: i64,
+    accel: i64,
+}
+
+impl NewtonSecondLaw {
+    fn sample(rng: &mut impl Rng, mass_range: &[i64; 2], accel_range: &[i64; 2]) -> Self {
+        Self {
+            mass: sample_in(rng, mass_range).abs().max(1),
+            accel: sample_in(rng, accel_range).abs().max(1),
+        }
+    }
+
+    fn force(&self) -> i64 {
+        self.mass * self.accel
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{A net force accelerates a }} {m}\\,\\text{{kg mass at }} {a}\\,\\text{{m/s}}^2. \\text{{ What is the force?}}",
+                m = self.mass,
+                a = self.accel
+            ),
+            solution: format!("{} N", self.force()),
+        }
+    }
+}
+
+struct Weight {
+    mass: i64,
+}
+
+impl Weight {
+    const G: f64 = 9.8;
+
+    fn sample(rng: &mut impl Rng, mass_range: &[i64; 2]) -> Self {
+        Self {
+            mass: sample_in(rng, mass_range).abs().max(1),
+        }
+    }
+
+    fn weight(&self) -> f64 {
+        self.mass as f64 * Self::G
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{What is the weight of a }} {m}\\,\\text{{kg object }} (g = 9.8\\,\\text{{m/s}}^2)?",
+                m = self.mass
+            ),
+            solution: format!("{} N", fmt_num(self.weight())),
+        }
+    }
+}
+
+struct UnitConversion {
+    km: i64,
+}
+
+impl UnitConversion {
+    fn sample(rng: &mut impl Rng, value_range: &[i64; 2]) -> Self {
+        Self {
+            km: sample_in(rng, value_range).abs().max(1),
+        }
+    }
+
+    fn metres(&self) -> i64 {
+        self.km * 1000
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{Convert }} {km}\\,\\text{{km to metres.}}",
+                km = self.km
+            ),
+            solution: format!("{} m", self.metres()),
+        }
+    }
+}
+
+/// Format a float as a tidy answer: `98` not `98.0`, `4.9` not `4.9000`.
+fn fmt_num(x: f64) -> String {
+    if (x.fract()).abs() < 1e-9 {
+        format!("{}", x.round() as i64)
+    } else {
+        let s = format!("{x:.4}");
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    }
+}
+
 // --- Sampling helpers ---
 
 fn sample_in(rng: &mut impl Rng, range: &[i64; 2]) -> i64 {
@@ -1589,6 +1823,48 @@ mod tests {
             assert!(inst.h >= 1 && inst.h <= inst.n);
             assert_eq!(gcd(p, q), 1);
         }
+    }
+
+    #[test]
+    fn physics_templates_are_correct_and_unit_graded() {
+        use lattice_core::answers_match;
+        let mut r = rng();
+        for _ in 0..500 {
+            let s = AverageSpeed::sample(&mut r, &[2, 30], &[2, 12]);
+            assert_eq!(s.distance(), s.speed * s.time);
+            let sol = s.render().solution;
+            assert!(answers_match(&sol, &format!("{} m/s", s.speed)));
+            // Right number, wrong unit must NOT grade as correct.
+            assert!(!answers_match(&sol, &format!("{} m/s^2", s.speed)));
+
+            let a = AccelerationFromSpeed::sample(&mut r, &[1, 8], &[2, 10]);
+            assert_eq!(a.delta_v(), a.accel * a.time);
+            assert!(answers_match(&a.render().solution, &format!("{} m/s^2", a.accel)));
+
+            let fv = FinalVelocity::sample(&mut r, &[0, 20], &[1, 8], &[2, 8]);
+            assert_eq!(fv.final_v(), fv.u + fv.a * fv.t);
+
+            let n = NewtonSecondLaw::sample(&mut r, &[1, 20], &[1, 10]);
+            assert_eq!(n.force(), n.mass * n.accel);
+            assert!(answers_match(&n.render().solution, &format!("{} N", n.force())));
+
+            let w = Weight::sample(&mut r, &[1, 50]);
+            assert!((w.weight() - w.mass as f64 * 9.8).abs() < 1e-9);
+            // The formatted answer grades against itself (unit round-trip).
+            let wsol = w.render().solution;
+            assert!(answers_match(&wsol, &wsol));
+
+            let uc = UnitConversion::sample(&mut r, &[1, 20]);
+            assert_eq!(uc.metres(), uc.km * 1000);
+            assert!(answers_match(&uc.render().solution, &format!("{} m", uc.km * 1000)));
+        }
+    }
+
+    #[test]
+    fn fmt_num_is_tidy() {
+        assert_eq!(fmt_num(98.0), "98");
+        assert_eq!(fmt_num(29.4), "29.4");
+        assert_eq!(fmt_num(49.0), "49");
     }
 
     #[test]
