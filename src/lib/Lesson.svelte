@@ -10,8 +10,23 @@
   // afterwards. Bad LaTeX falls back to its source rather than throwing.
   let html = $derived.by(() => render(source));
 
-  function render(src) {
-    if (!src) return '';
+  // Drop optional `---`-fenced frontmatter (source/license) so it never renders
+  // as a stray rule + key lines — mirrors the backend's split_frontmatter, and
+  // lets the editor preview raw file content directly.
+  function stripFrontmatter(src) {
+    if (!src.startsWith('---\n') && !src.startsWith('---\r\n')) return src;
+    const lines = src.split('\n');
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim() === '---') {
+        return lines.slice(i + 1).join('\n').replace(/^[\r\n]+/, '');
+      }
+    }
+    return src; // no closing fence — treat as ordinary body
+  }
+
+  function render(raw) {
+    if (!raw) return '';
+    const src = stripFrontmatter(raw);
     const math = [];
     const stash = (tex, display) => {
       math.push({ tex: tex.trim(), display });

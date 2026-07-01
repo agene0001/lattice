@@ -56,9 +56,11 @@
   let lessonBusy = $state(false);
   let editing = $state(false);
   let draft = $state('');
+  let editOriginal = $state(''); // what the editor loaded, to detect unsaved edits
   let drafting = $state(false);
   let savingLesson = $state(false);
   let lessonSaved = $state(false);
+  let lessonDirty = $derived(editing && draft !== editOriginal);
 
   // Friendly phrasing for the deterministic diagnosis reason (spec §2.2).
   const REASON = {
@@ -304,6 +306,7 @@
     error = null;
     try {
       draft = await draftLesson(learnSel);
+      editOriginal = ''; // a fresh AI draft is all-new relative to what's saved
       editing = true;
     } catch (e) {
       error = String(e);
@@ -312,9 +315,20 @@
     }
   }
 
+  // Edit the actual on-disk file (frontmatter included), so saving preserves any
+  // source/license attribution. A brand-new lesson starts from a title scaffold.
   function startEdit() {
-    draft = lessonData?.notes ?? '';
+    draft = lessonData?.raw ?? (lessonData ? `# ${lessonData.label}\n\n` : '');
+    editOriginal = draft;
     editing = true;
+  }
+
+  // ⌘/Ctrl-S saves from inside the editor.
+  function editorKeydown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      saveLessonDraft();
+    }
   }
 
   async function saveLessonDraft() {
@@ -741,26 +755,41 @@
             {#if editing}
               <section class="card lesson-editor">
                 <label for="draft" class="field-label">
-                  Lesson source <span class="muted">— Markdown, math as $inline$ and $$display$$</span>
+                  Lesson &amp; notes
+                  <span class="muted">
+                    — your Markdown. Math as $inline$ / $$display$$; a
+                    <code>---</code> frontmatter block with <code>source:</code> /
+                    <code>license:</code> credits a textbook.
+                  </span>
                 </label>
-                <textarea id="draft" rows="16" bind:value={draft}></textarea>
+                <textarea
+                  id="draft"
+                  rows="22"
+                  bind:value={draft}
+                  onkeydown={editorKeydown}
+                  placeholder={'# Title\n\nWrite the concept in your own words, paste notes from what you’re reading, add $x^2$ math…'}
+                ></textarea>
                 <div class="actions">
                   <button
                     class="primary"
                     onclick={saveLessonDraft}
-                    disabled={savingLesson || !draft.trim()}
+                    disabled={savingLesson || !draft.trim() || !lessonDirty}
                   >
-                    {savingLesson ? 'Saving…' : 'Save lesson'}
+                    {savingLesson ? 'Saving…' : 'Save'}
                   </button>
                   <button class="ghost" onclick={() => (editing = false)} disabled={savingLesson}>
-                    Cancel
+                    {lessonDirty ? 'Discard changes' : 'Close'}
                   </button>
                   {#if settings?.has_key}
                     <button onclick={draftWithAi} disabled={drafting}>
                       {drafting ? 'Drafting…' : 'Re-draft with AI'}
                     </button>
                   {/if}
-                  {#if lessonSaved}<span class="key-set">Saved ✓</span>{/if}
+                  {#if lessonDirty}
+                    <span class="muted dirty">• unsaved changes <kbd>⌘S</kbd></span>
+                  {:else if lessonSaved}
+                    <span class="key-set">Saved ✓</span>
+                  {/if}
                 </div>
                 {#if draft.trim()}
                   <div class="preview">
@@ -780,7 +809,7 @@
                 {/if}
               </article>
               <div class="actions">
-                <button class="ghost" onclick={startEdit}>Edit lesson</button>
+                <button class="ghost" onclick={startEdit}>Edit / add notes</button>
               </div>
             {:else}
               <section class="card empty-lesson">

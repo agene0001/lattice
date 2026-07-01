@@ -92,9 +92,14 @@ pub struct Lesson {
     pub label: String,
     pub group: String,
     pub prerequisites: Vec<ConceptId>,
-    /// Original Markdown+KaTeX lesson body (frontmatter stripped), or `None` if
-    /// none has been written yet.
+    /// Original Markdown+KaTeX lesson body (frontmatter stripped), for rendering.
+    /// `None` if no lesson has been written yet.
     pub notes: Option<String>,
+    /// The full on-disk file including any frontmatter — what the editor loads, so
+    /// that saving an edit preserves (and can change) `source`/`license` instead
+    /// of dropping them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw: Option<String>,
     /// Attribution from the lesson's frontmatter, when adapted from a source.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
@@ -360,9 +365,10 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
             .ok_or_else(|| ServiceError::UnknownConcept(concept.clone()))?;
         // Strip optional frontmatter so the body renders cleanly and the source
         // /license surface separately for attribution.
-        let (meta, notes) = match self.read_notes(concept) {
+        let raw_file = self.read_notes(concept);
+        let (meta, notes) = match &raw_file {
             Some(raw) => {
-                let (meta, body) = split_frontmatter(&raw);
+                let (meta, body) = split_frontmatter(raw);
                 (meta, (!body.trim().is_empty()).then(|| body.to_string()))
             }
             None => (Default::default(), None),
@@ -373,6 +379,7 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
             group: c.group.clone(),
             prerequisites: c.prerequisites.clone(),
             notes,
+            raw: raw_file,
             source: meta.source,
             license: meta.license,
             practiceable: self.has_practice(concept),
@@ -715,6 +722,32 @@ mod tests {
             svc.lesson(&ConceptId::new("nope")),
             Err(ServiceError::UnknownConcept(_))
         ));
+
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[tokio::test]
+    async fn editing_a_lesson_preserves_frontmatter_attribution() {
+        let subject = load_subject(math_dir()).unwrap();
+        let storage = SqliteStorage::connect_in_memory().await.unwrap();
+        let tmp = std::env::temp_dir().join(format!("lattice-fm-{}", std::process::id()));
+        let svc = LatticeService::new(subject, storage, Bkt::default())
+            .unwrap()
+            .with_notes_root(&tmp);
+        let concept = ConceptId::new("expectation");
+
+        // The editor saves the full raw file (frontmatter included).
+        let file = "---\nsource: OpenStax\nlicense: CC BY 4.0\n---\n\n# Expectation\n\nBody $E[X]$.";
+        svc.save_lesson(&concept, file).unwrap();
+
+        let lesson = svc.lesson(&concept).unwrap();
+        // `raw` is what the editor re-loads — frontmatter intact, so a re-save
+        // can't silently drop the attribution.
+        assert_eq!(lesson.raw.as_deref(), Some(file));
+        // `notes` renders the body only; source/license surface for the footer.
+        assert_eq!(lesson.notes.as_deref(), Some("# Expectation\n\nBody $E[X]$."));
+        assert_eq!(lesson.source.as_deref(), Some("OpenStax"));
+        assert_eq!(lesson.license.as_deref(), Some("CC BY 4.0"));
 
         std::fs::remove_dir_all(&tmp).ok();
     }

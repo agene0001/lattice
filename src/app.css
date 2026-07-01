@@ -629,7 +629,28 @@ button.ghost {
   padding: 1.35rem 1.5rem;
 }
 .lesson-editor textarea {
-  min-height: 18rem;
+  min-height: 22rem;
+  line-height: 1.55;
+}
+.lesson-editor .dirty {
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.lesson-editor kbd {
+  font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.02rem 0.3rem;
+  background: var(--panel-2);
+}
+.field-label code {
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 0.02rem 0.28rem;
+  font-size: 0.85em;
 }
 .lesson-editor .preview {
   margin-top: 1rem;
