@@ -383,6 +383,14 @@ button.ghost {
   opacity: 0.5;
   cursor: default;
 }
+/* Cross-subject prerequisite chip (e.g. a Physics concept building on Math). */
+.chip.cross {
+  border-color: rgba(111, 92, 255, 0.5);
+}
+.chip.cross .cross-subj {
+  color: var(--accent-2);
+  font-size: 0.9em;
+}
 
 .builds-on {
   display: flex;

@@ -14,8 +14,8 @@ use std::collections::HashMap;
 use chrono::Utc;
 use lattice_content::{load_subject, split_frontmatter, StaticProblem, Subject, Template};
 use lattice_core::{
-    Attempt, AttemptId, ConceptId, Diagnosis, DiagnosisId, Difficulty, LearnerId, MasteryState,
-    Problem, ProblemId, ProblemSource, SubjectId,
+    Attempt, AttemptId, ConceptId, ConceptRef, Diagnosis, DiagnosisId, Difficulty, LearnerId,
+    MasteryState, Problem, ProblemId, ProblemSource, SubjectId,
 };
 use lattice_diagnosis::DiagnosisRequest;
 pub use lattice_diagnosis::{Provider, ProviderConfig};
@@ -71,6 +71,9 @@ pub struct ConceptStatus {
     pub label: String,
     pub group: String,
     pub prerequisites: Vec<ConceptId>,
+    /// Prerequisites in other subjects (cross-subject edges), for display + jump.
+    #[serde(default)]
+    pub external_prerequisites: Vec<ConceptRef>,
     /// Current decay-adjusted mastery in `[0, 1]`.
     pub estimated_mastery: f32,
     /// Last observed label, if the learner has ever practiced this.
@@ -92,6 +95,9 @@ pub struct Lesson {
     pub label: String,
     pub group: String,
     pub prerequisites: Vec<ConceptId>,
+    /// Prerequisites in other subjects (cross-subject edges), for display + jump.
+    #[serde(default)]
+    pub external_prerequisites: Vec<ConceptRef>,
     /// Original Markdown+KaTeX lesson body (frontmatter stripped), for rendering.
     /// `None` if no lesson has been written yet.
     pub notes: Option<String>,
@@ -342,6 +348,7 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
                     label: c.label.clone(),
                     group: c.group.clone(),
                     prerequisites: c.prerequisites.clone(),
+                    external_prerequisites: c.external_prerequisites.clone(),
                     estimated_mastery: mastery
                         .map_or(0.0, |m| self.model.estimated_mastery(m, now)),
                     state: mastery.map(|m| m.state),
@@ -378,6 +385,7 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
             label: c.label.clone(),
             group: c.group.clone(),
             prerequisites: c.prerequisites.clone(),
+            external_prerequisites: c.external_prerequisites.clone(),
             notes,
             raw: raw_file,
             source: meta.source,
@@ -446,6 +454,14 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
     /// Curriculum groups in display order.
     pub fn groups(&self) -> &[String] {
         &self.subject.groups
+    }
+
+    /// A concept's display label and whether it's practiceable — used by the
+    /// orchestration layer to resolve a cross-subject prerequisite reference.
+    pub fn concept_brief(&self, concept: &ConceptId) -> Option<(String, bool)> {
+        self.graph
+            .get(concept)
+            .map(|c| (c.label.clone(), self.has_practice(concept)))
     }
 
     // --- internals ---

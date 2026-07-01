@@ -268,6 +268,7 @@ mod tests {
             group: "test".to_string(),
             notes: None,
             prerequisites: prereqs.iter().map(|p| ConceptId::new(*p)).collect(),
+            external_prerequisites: Vec::new(),
         }
     }
 

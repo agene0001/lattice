@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use lattice_core::{Attribution, Concept, ConceptId, Difficulty, SubjectId};
+use lattice_core::{Attribution, Concept, ConceptId, ConceptRef, Difficulty, SubjectId};
 use serde::Deserialize;
 
 use crate::template::Template;
@@ -70,13 +70,17 @@ pub fn load_subject(dir: impl AsRef<Path>) -> Result<Subject, LoadError> {
         .into_iter()
         .map(|c| {
             let notes = read_notes(dir, c.id.as_str());
+            // A prereq written `"subject:concept"` is cross-subject; a bare id is
+            // local. Split them so the local DAG stays resolvable on its own.
+            let (external_prerequisites, prerequisites) = split_prerequisites(c.prerequisites);
             Concept {
                 id: c.id,
                 subject_id: subject_id.clone(),
                 label: c.label,
                 group: c.group,
                 notes,
-                prerequisites: c.prerequisites,
+                prerequisites,
+                external_prerequisites,
             }
         })
         .collect();
@@ -160,8 +164,27 @@ struct ConceptDef {
     label: String,
     #[serde(default)]
     group: String,
+    /// Raw prereq tokens: a bare `"derivatives"` is local; `"math:derivatives"`
+    /// is a cross-subject edge.
     #[serde(default)]
-    prerequisites: Vec<ConceptId>,
+    prerequisites: Vec<String>,
+}
+
+/// Partition raw prereq tokens into `(external, local)`. A token containing a
+/// `:` is `"<subject>:<concept>"`; anything else is a local concept id.
+fn split_prerequisites(raw: Vec<String>) -> (Vec<ConceptRef>, Vec<ConceptId>) {
+    let mut external = Vec::new();
+    let mut local = Vec::new();
+    for token in raw {
+        match token.split_once(':') {
+            Some((subject, concept)) => external.push(ConceptRef {
+                subject: SubjectId::new(subject.trim()),
+                concept: ConceptId::new(concept.trim()),
+            }),
+            None => local.push(ConceptId::new(token)),
+        }
+    }
+    (external, local)
 }
 
 #[derive(Deserialize)]
@@ -284,8 +307,9 @@ mod tests {
     /// all subjects at once (math, physics, and any added later) against typos.
     #[test]
     fn all_authored_subjects_are_valid() {
+        use std::collections::HashMap;
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../subjects");
-        let mut checked = 0;
+        let mut subjects: HashMap<String, Subject> = HashMap::new();
         for entry in std::fs::read_dir(&root).expect("subjects dir") {
             let dir = entry.unwrap().path();
             if !dir.join("concepts.json").is_file() {
@@ -315,9 +339,29 @@ mod tests {
                     p.concept
                 );
             }
-            checked += 1;
+            subjects.insert(subject.id.to_string(), subject);
         }
-        assert!(checked >= 2, "expected at least math + physics subjects");
+        assert!(subjects.len() >= 2, "expected at least math + physics subjects");
+
+        // Every cross-subject prerequisite must resolve to a real concept in the
+        // referenced subject — the guard against a typo'd `"math:derivatvies"`.
+        for subject in subjects.values() {
+            for concept in &subject.concepts {
+                for r in &concept.external_prerequisites {
+                    let target = subjects.get(r.subject.as_str()).unwrap_or_else(|| {
+                        panic!("{}/{} references unknown subject `{}`", subject.id, concept.id, r.subject)
+                    });
+                    assert!(
+                        target.concepts.iter().any(|c| c.id == r.concept),
+                        "{}/{} references unknown concept `{}:{}`",
+                        subject.id,
+                        concept.id,
+                        r.subject,
+                        r.concept
+                    );
+                }
+            }
+        }
     }
 
     /// Every template must target a concept that actually exists in the graph.

@@ -5,6 +5,8 @@ import { invoke } from '@tauri-apps/api/core';
 // --- Subjects (multi-subject: the app boots one service per subjects/<id>/) ---
 export const listSubjects = () => invoke('list_subjects');
 export const selectSubject = (subjectId) => invoke('select_subject', { subjectId });
+// Resolve cross-subject prerequisite refs to {subject_id, subject_name, concept_id, label, practiceable}.
+export const resolveRefs = (refs) => invoke('resolve_refs', { refs });
 export const subjectInfo = () => invoke('subject_info');
 export const conceptMap = () => invoke('concept_map');
 export const nextProblem = () => invoke('next_problem');

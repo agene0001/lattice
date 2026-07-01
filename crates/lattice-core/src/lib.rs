@@ -177,9 +177,23 @@ pub struct Concept {
     /// content shown before/alongside practice.
     #[serde(default)]
     pub notes: Option<String>,
-    /// Direct prerequisites only — the transitive closure is computed by
-    /// `lattice-graph`, not stored here.
+    /// Direct prerequisites *within this subject* — the transitive closure is
+    /// computed by `lattice-graph`, not stored here.
     pub prerequisites: Vec<ConceptId>,
+    /// Prerequisites in *other* subjects (e.g. a Physics concept building on a
+    /// Math calculus node). Kept separate from [`prerequisites`](Self::prerequisites)
+    /// so the per-subject DAG stays local and unchanged; cross-subject edges are
+    /// an additive concern resolved at the orchestration layer.
+    #[serde(default)]
+    pub external_prerequisites: Vec<ConceptRef>,
+}
+
+/// A reference to a concept in a specific subject — how a cross-subject
+/// prerequisite is expressed (authored as `"subject:concept"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConceptRef {
+    pub subject: SubjectId,
+    pub concept: ConceptId,
 }
 
 /// A learner's mastery of one concept at a point in time (spec §5).

@@ -6,6 +6,7 @@
   import {
     listSubjects,
     selectSubject,
+    resolveRefs,
     subjectInfo,
     conceptMap,
     nextProblem,
@@ -53,6 +54,7 @@
   // AI-drafted, edited, and saved from here.
   let learnSel = $state(null);
   let lessonData = $state(null);
+  let externalPrereqs = $state([]); // resolved cross-subject prerequisites
   let lessonBusy = $state(false);
   let editing = $state(false);
   let draft = $state('');
@@ -278,12 +280,16 @@
   async function openLesson(id) {
     learnSel = id;
     lessonData = null;
+    externalPrereqs = [];
     editing = false;
     draft = '';
     error = null;
     lessonBusy = true;
     try {
       lessonData = await fetchLesson(id);
+      // Resolve cross-subject prerequisites (labels + subject names) for display.
+      const refs = lessonData?.external_prerequisites ?? [];
+      externalPrereqs = refs.length ? await resolveRefs(refs) : [];
     } catch (e) {
       error = String(e);
     } finally {
@@ -294,8 +300,17 @@
   function closeLesson() {
     learnSel = null;
     lessonData = null;
+    externalPrereqs = [];
     editing = false;
     draft = '';
+  }
+
+  // Jump to a prerequisite that lives in another subject: switch subjects, then
+  // practise that concept there.
+  async function crossPractice(ref) {
+    if (busy) return;
+    await switchSubject(ref.subject_id);
+    await practice(ref.concept_id);
   }
 
   // Draft an original lesson with the configured LLM, dropped into the editor
@@ -743,11 +758,20 @@
               {/if}
             </header>
 
-            {#if lessonData.prerequisites.length}
+            {#if lessonData.prerequisites.length || externalPrereqs.length}
               <div class="builds-on">
                 <span class="muted">Builds on:</span>
                 {#each lessonData.prerequisites as p}
                   {@render conceptChip(p, 'small')}
+                {/each}
+                {#each externalPrereqs as r}
+                  <button
+                    class="chip clickable small cross"
+                    onclick={() => crossPractice(r)}
+                    title="Practise in {r.subject_name}"
+                  >
+                    {r.label} <span class="cross-subj">↗ {r.subject_name}</span>
+                  </button>
                 {/each}
               </div>
             {/if}

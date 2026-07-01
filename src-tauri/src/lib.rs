@@ -9,7 +9,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use lattice_core::{AttemptId, ConceptId, Diagnosis, Difficulty, LearnerId, Problem, ProblemId};
+use lattice_core::{
+    AttemptId, ConceptId, ConceptRef, Diagnosis, Difficulty, LearnerId, Problem, ProblemId,
+};
 use lattice_graph::{Bkt, BktParams};
 use lattice_service::{
     AttemptOutcome, ConceptStatus, LatticeService, Lesson, Provider, ProviderConfig, ServiceError,
@@ -86,6 +88,41 @@ async fn select_subject(state: State<'_, AppState>, subject_id: String) -> Resul
         .lock()
         .map_err(|_| "subject selection lock poisoned".to_string())? = subject_id;
     Ok(())
+}
+
+/// A cross-subject prerequisite resolved to something the UI can show and link:
+/// the target subject's name and the concept's label + practiceability. Resolving
+/// this needs *all* subjects, so it lives here (the registry), not in a single
+/// per-subject service.
+#[derive(Serialize)]
+struct ResolvedRef {
+    subject_id: String,
+    subject_name: String,
+    concept_id: String,
+    label: String,
+    practiceable: bool,
+}
+
+#[tauri::command]
+async fn resolve_refs(
+    state: State<'_, AppState>,
+    refs: Vec<ConceptRef>,
+) -> Result<Vec<ResolvedRef>, String> {
+    let mut out = Vec::new();
+    for r in refs {
+        if let Some(service) = state.subjects.get(r.subject.as_str()) {
+            if let Some((label, practiceable)) = service.concept_brief(&r.concept) {
+                out.push(ResolvedRef {
+                    subject_id: r.subject.to_string(),
+                    subject_name: service.subject_name().to_string(),
+                    concept_id: r.concept.to_string(),
+                    label,
+                    practiceable,
+                });
+            }
+        }
+    }
+    Ok(out)
 }
 
 #[tauri::command]
@@ -425,6 +462,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_subjects,
             select_subject,
+            resolve_refs,
             subject_info,
             concept_map,
             next_problem,
