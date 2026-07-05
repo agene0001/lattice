@@ -13,7 +13,8 @@
 //! problem *form* needs a new [`TemplateKind`] variant plus its sampler.
 
 use lattice_core::{ConceptId, Difficulty, Problem, ProblemId, ProblemSource, SubjectId};
-use rand::Rng;
+// rand 0.10 moved range sampling (`random_range`) onto the `RngExt` trait.
+use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
 
 /// One authored template: which concept it drills, at what difficulty, plus the

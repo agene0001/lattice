@@ -321,7 +321,7 @@ impl MasteryModel for Bkt {
 mod tests {
     use super::*;
     use chrono::Duration;
-    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rand::{rngs::StdRng, Rng, RngExt, SeedableRng};
 
     #[test]
     fn bkt_rises_with_correct_and_falls_with_incorrect() {

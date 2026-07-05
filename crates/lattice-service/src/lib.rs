@@ -24,7 +24,8 @@ use lattice_graph::{
     MasteryModel, WeakLink,
 };
 use lattice_storage::{SqliteStorage, Storage, StorageError};
-use rand::Rng;
+// rand 0.10 moved range sampling (`random_range`) onto the `RngExt` trait.
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, thiserror::Error)]
