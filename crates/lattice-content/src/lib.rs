@@ -15,7 +15,7 @@ pub mod lesson;
 pub mod subject;
 pub mod template;
 
-pub use generate::{generate_problem, GenError};
+pub use generate::{explain_problem, generate_problem, GenError};
 pub use lesson::{draft_lesson, split_frontmatter, LessonMeta};
 pub use subject::{load_subject, LoadError, StaticProblem, Subject};
 pub use template::{Instance, Template, TemplateKind};

@@ -309,8 +309,11 @@ impl Storage for SqliteStorage {
             content: row.try_get("content")?,
             solution: row.try_get("solution")?,
             generated_by: enum_from_db(&row.try_get::<String, _>("generated_by")?)?,
-            // Attribution is display-only and not persisted; absent on reload.
+            // Attribution, hints and steps are serve-time display metadata, not
+            // persisted; a reloaded problem carries only what grading needs.
             attribution: None,
+            hints: Vec::new(),
+            steps: Vec::new(),
         }))
     }
 
@@ -480,6 +483,8 @@ mod tests {
             solution: "(x-1)(x+1)".into(),
             generated_by: ProblemSource::Template,
             attribution: None,
+            hints: Vec::new(),
+            steps: Vec::new(),
         };
         store.save_problem(&problem).await.unwrap();
         assert_eq!(store.get_problem(problem.id).await.unwrap().unwrap(), problem);

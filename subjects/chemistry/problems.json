@@ -1,5 +1,5 @@
 {
-  "_comment": "Chemistry uses \\ce{} (mhchem) in content for formulas/equations. Molar-mass answers carry g/mol and are graded by the units-aware answers_match.",
+  "_comment": "Chemistry uses \\ce{} (mhchem) in content for formulas/equations. Molar-mass answers carry g/mol and are graded by the units-aware answers_match. hints/steps teach when stuck (markdown + $math$).",
   "problems": [
     {
       "id": "chem_mm_water",
@@ -7,7 +7,16 @@
       "difficulty": "easy",
       "content": "\\text{What is the molar mass of } \\ce{H2O}? \\quad (\\text{H} = 1,\\ \\text{O} = 16)",
       "solution": "18 g/mol",
-      "source": "Authored for Lattice"
+      "source": "Authored for Lattice",
+      "hints": [
+        "Count how many of each atom the formula has.",
+        "Multiply each atom's count by its atomic mass, then add them up."
+      ],
+      "steps": [
+        "$\\ce{H2O}$ has 2 hydrogen atoms and 1 oxygen atom.",
+        "Multiply counts by atomic masses: $2 \\times 1 + 1 \\times 16$.",
+        "$= 2 + 16 = 18$, so the molar mass is $18\\ \\text{g/mol}$."
+      ]
     },
     {
       "id": "chem_mm_co2",
@@ -15,7 +24,16 @@
       "difficulty": "easy",
       "content": "\\text{What is the molar mass of } \\ce{CO2}? \\quad (\\text{C} = 12,\\ \\text{O} = 16)",
       "solution": "44 g/mol",
-      "source": "Authored for Lattice"
+      "source": "Authored for Lattice",
+      "hints": [
+        "Count the atoms: how many C and how many O?",
+        "Multiply each by its atomic mass, then add."
+      ],
+      "steps": [
+        "$\\ce{CO2}$ has 1 carbon atom and 2 oxygen atoms.",
+        "$1 \\times 12 + 2 \\times 16 = 12 + 32$.",
+        "$= 44$, so the molar mass is $44\\ \\text{g/mol}$."
+      ]
     },
     {
       "id": "chem_moles_water",
@@ -23,7 +41,16 @@
       "difficulty": "medium",
       "content": "\\text{How many moles are in } 36\\,\\text{g of } \\ce{H2O}? \\quad (M = 18\\,\\text{g/mol})",
       "solution": "2 mol",
-      "source": "Authored for Lattice"
+      "source": "Authored for Lattice",
+      "hints": [
+        "Which formula connects mass, moles, and molar mass?",
+        "Use $n = m / M$ — divide the mass by the molar mass."
+      ],
+      "steps": [
+        "Number of moles is $n = \\dfrac{m}{M}$.",
+        "$n = \\dfrac{36\\ \\text{g}}{18\\ \\text{g/mol}}$.",
+        "The grams cancel, leaving $n = 2\\ \\text{mol}$."
+      ]
     },
     {
       "id": "chem_balance_water",
@@ -31,7 +58,17 @@
       "difficulty": "medium",
       "content": "\\text{Balance } \\ce{H2 + O2 -> H2O}. \\text{ Give the coefficients of } \\ce{H2}, \\ce{O2}, \\ce{H2O}.",
       "solution": "2, 1, 2",
-      "source": "Authored for Lattice"
+      "source": "Authored for Lattice",
+      "hints": [
+        "Count each element on both sides — which one doesn't balance yet?",
+        "Never change subscripts; only put whole-number coefficients in front.",
+        "Balance oxygen first, then fix hydrogen."
+      ],
+      "steps": [
+        "Start with $\\ce{H2 + O2 -> H2O}$: the right side has 1 O, the left has 2 — oxygen is unbalanced.",
+        "Put a 2 before water: $\\ce{H2 + O2 -> 2H2O}$. Now O is $2 = 2$, but H is $2$ on the left vs $4$ on the right.",
+        "Put a 2 before $\\ce{H2}$: $\\ce{2H2 + O2 -> 2H2O}$. Now H $= 4$ and O $= 2$ on both sides. Coefficients: $2, 1, 2$."
+      ]
     }
   ]
 }

@@ -21,6 +21,7 @@
     setDiagnosisSettings,
     setApiKey,
     diagnoseAttempt,
+    explainProblem,
     generateAiProblem
   } from '$lib/api.js';
 
@@ -35,6 +36,11 @@
   let busy = $state(false);
   let error = $state(null);
   let showSolution = $state(false);
+  // "Teach when stuck": progressive hints, worked steps, and an AI explainer.
+  let hintLevel = $state(0);
+  let showSteps = $state(false);
+  let explanation = $state(null);
+  let explaining = $state(false);
   let notice = $state(null);
   let model = $state(null);
 
@@ -124,6 +130,9 @@
     outcome = null;
     diagnosis = null;
     showSolution = false;
+    hintLevel = 0;
+    showSteps = false;
+    explanation = null;
     work = '';
     try {
       problem = await nextProblem();
@@ -155,6 +164,9 @@
     outcome = null;
     diagnosis = null;
     showSolution = false;
+    hintLevel = 0;
+    showSteps = false;
+    explanation = null;
     work = '';
     try {
       problem = await generateAiProblem(cid, aiDifficulty);
@@ -162,6 +174,26 @@
       error = String(e);
     } finally {
       generating = false;
+    }
+  }
+
+  // Reveal the next hint in the ladder (stops at the last one).
+  function revealHint() {
+    if (problem?.hints?.length) hintLevel = Math.min(hintLevel + 1, problem.hints.length);
+  }
+
+  // Teach-when-stuck fallback: a BYOK step-by-step worked solution for problems
+  // that have no authored steps, anchored to the known-correct answer.
+  async function explainStuck() {
+    if (!problem || explaining) return;
+    explaining = true;
+    error = null;
+    try {
+      explanation = await explainProblem(problem.id);
+    } catch (e) {
+      error = String(e);
+    } finally {
+      explaining = false;
     }
   }
 
@@ -188,6 +220,9 @@
       outcome = null;
       diagnosis = null;
       showSolution = false;
+    hintLevel = 0;
+    showSteps = false;
+    explanation = null;
       view = 'practice';
     }
   }
@@ -264,6 +299,9 @@
     outcome = null;
     diagnosis = null;
     showSolution = false;
+    hintLevel = 0;
+    showSteps = false;
+    explanation = null;
     work = '';
     try {
       problem = await practiceConcept(conceptId);
@@ -555,10 +593,66 @@
                 Learn this concept
               </button>
               <button type="button" class="ghost" onclick={() => (showSolution = !showSolution)}>
-                {showSolution ? 'Hide' : 'Show'} solution
+                {showSolution ? 'Hide' : 'Show'} answer
               </button>
             </div>
           </form>
+
+          <!-- Teach when stuck: hint ladder → worked solution (authored or AI). -->
+          <div class="stuck">
+            <span class="muted">Stuck?</span>
+            {#if problem.hints?.length}
+              <button
+                type="button"
+                class="ghost"
+                onclick={revealHint}
+                disabled={hintLevel >= problem.hints.length}
+              >
+                {hintLevel === 0
+                  ? 'Hint'
+                  : hintLevel >= problem.hints.length
+                    ? 'No more hints'
+                    : `Next hint (${hintLevel}/${problem.hints.length})`}
+              </button>
+            {/if}
+            {#if problem.steps?.length}
+              <button type="button" class="ghost" onclick={() => (showSteps = !showSteps)}>
+                {showSteps ? 'Hide' : 'Show'} worked solution
+              </button>
+            {:else if settings?.has_key}
+              <button type="button" class="ghost" onclick={explainStuck} disabled={explaining}>
+                {explaining ? 'Explaining…' : 'Explain step-by-step (AI)'}
+              </button>
+            {/if}
+          </div>
+
+          {#if hintLevel > 0 && problem.hints?.length}
+            <ol class="hint-list">
+              {#each problem.hints.slice(0, hintLevel) as h}
+                <li><Lesson source={h} /></li>
+              {/each}
+            </ol>
+          {/if}
+
+          {#if showSteps && problem.steps?.length}
+            <div class="worked">
+              <span class="muted worked-label">Worked solution</span>
+              <ol class="step-list">
+                {#each problem.steps as s}
+                  <li><Lesson source={s} /></li>
+                {/each}
+              </ol>
+            </div>
+          {/if}
+
+          {#if explanation}
+            <div class="worked">
+              <div class="ai-head">
+                <span class="ai-badge">AI</span><strong>Step-by-step worked solution</strong>
+              </div>
+              <Lesson source={explanation} />
+            </div>
+          {/if}
 
           {#if settings?.has_key}
             <div class="ai-gen">
@@ -576,7 +670,7 @@
 
           {#if showSolution}
             <div class="solution">
-              <span class="muted">Solution:</span> <Katex tex={problem.solution} />
+              <span class="muted">Answer:</span> <Katex tex={problem.solution} />
             </div>
           {/if}
         </section>

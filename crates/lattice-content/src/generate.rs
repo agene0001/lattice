@@ -54,6 +54,8 @@ pub async fn generate_problem(
                 solution: candidate.solution,
                 generated_by: ProblemSource::Ai,
                 attribution: None,
+                hints: Vec::new(),
+                steps: Vec::new(),
             });
         }
     }
@@ -94,4 +96,28 @@ async fn solve(config: &ProviderConfig, content: &str) -> Result<String, GenErro
     let system = "You are solving a math problem. Reply with ONLY the final answer — \
         no working, no prose.";
     Ok(complete(config, system, content).await?)
+}
+
+/// Produce a step-by-step worked solution for a problem whose correct final
+/// answer is already known — the "teach me when I'm stuck" path (spec §2.5).
+///
+/// Passing the verified `solution` in anchors the explanation to the right answer
+/// (far lower risk than open generation): the model shows the *method* toward a
+/// known target rather than inventing both problem and answer.
+pub async fn explain_problem(
+    config: &ProviderConfig,
+    content: &str,
+    solution: &str,
+) -> Result<String, GenError> {
+    let system = "You are a patient tutor. Given a problem and its correct final \
+        answer, write a clear, NUMBERED step-by-step worked solution that teaches \
+        the method: show the reasoning and every intermediate result, and end by \
+        arriving at the given answer. Do NOT merely restate the answer. Use \
+        Markdown with KaTeX math (inline $...$, display $$...$$). Be concise but \
+        complete — no preamble, no code fences.";
+    let user = format!(
+        "Problem:\n{content}\n\nCorrect final answer: {solution}\n\n\
+         Write the step-by-step worked solution."
+    );
+    Ok(complete(config, system, &user).await?)
 }

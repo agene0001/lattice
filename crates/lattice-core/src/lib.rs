@@ -230,6 +230,15 @@ pub struct Problem {
     /// metadata, not persisted (grading re-fetches by id without needing it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Option<Attribution>,
+    /// A progressive hint ladder — each string nudges a little further without
+    /// giving the answer. Shown one at a time when the learner is stuck. Serve-
+    /// time display metadata (like [`attribution`](Self::attribution)); not persisted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hints: Vec<String>,
+    /// The worked solution as ordered steps (KaTeX), so "I'm stuck" reveals the
+    /// *method*, not just the final answer. Serve-time display metadata.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<String>,
 }
 
 /// A learner's submitted attempt (spec §5).

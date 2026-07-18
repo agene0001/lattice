@@ -35,6 +35,10 @@ pub struct StaticProblem {
     pub content: String,
     pub solution: String,
     pub attribution: Option<Attribution>,
+    /// Progressive hint ladder (optional).
+    pub hints: Vec<String>,
+    /// Worked-solution steps, KaTeX (optional).
+    pub steps: Vec<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -210,6 +214,10 @@ struct StaticProblemDef {
     source: Option<String>,
     #[serde(default)]
     license: Option<String>,
+    #[serde(default)]
+    hints: Vec<String>,
+    #[serde(default)]
+    steps: Vec<String>,
 }
 
 impl StaticProblemDef {
@@ -228,6 +236,8 @@ impl StaticProblemDef {
             content: self.content,
             solution: self.solution,
             attribution,
+            hints: self.hints,
+            steps: self.steps,
         }
     }
 }

@@ -184,6 +184,8 @@ impl Template {
             solution: instance.solution,
             generated_by: ProblemSource::Template,
             attribution: None,
+            hints: Vec::new(),
+            steps: Vec::new(),
         }
     }
 }

@@ -282,6 +282,24 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
         Ok(problem)
     }
 
+    /// Teach when stuck: a BYOK step-by-step worked solution for a problem,
+    /// anchored to its known-correct answer (spec §2.5). Works for any problem —
+    /// templated, static, or AI — that lacks authored [`steps`](Problem::steps).
+    pub async fn explain_problem(
+        &self,
+        problem_id: ProblemId,
+        provider: &ProviderConfig,
+    ) -> Result<String, ServiceError> {
+        let problem = self
+            .storage
+            .get_problem(problem_id)
+            .await?
+            .ok_or(ServiceError::ProblemNotFound(problem_id))?;
+        lattice_content::explain_problem(provider, &problem.content, &problem.solution)
+            .await
+            .map_err(|e| ServiceError::Generation(e.to_string()))
+    }
+
     /// Grade a submission, log it, update mastery, and on failure trace the weak
     /// prerequisite and offer targeted practice — the whole V1 loop.
     pub async fn submit_attempt(
@@ -596,6 +614,8 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
                     solution: s.solution.clone(),
                     generated_by: ProblemSource::Static,
                     attribution: s.attribution.clone(),
+                    hints: s.hints.clone(),
+                    steps: s.steps.clone(),
                 },
             }
         };
@@ -670,6 +690,8 @@ mod tests {
             solution: sol.to_string(),
             generated_by: ProblemSource::Template,
             attribution: None,
+            hints: Vec::new(),
+            steps: Vec::new(),
         }
     }
 

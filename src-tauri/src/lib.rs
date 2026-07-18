@@ -427,6 +427,26 @@ async fn diagnose_attempt(
 }
 
 #[tauri::command]
+async fn explain_problem(
+    state: State<'_, AppState>,
+    problem_id: ProblemId,
+) -> Result<String, String> {
+    let settings = load_settings(&state.config_dir);
+    let api_key = read_api_key(settings.provider)
+        .ok_or_else(|| format!("No API key set for {}.", settings.provider.label()))?;
+    let provider = ProviderConfig {
+        provider: settings.provider,
+        api_key,
+        model: settings.model,
+    };
+    state
+        .active_service()?
+        .explain_problem(problem_id, &provider)
+        .await
+        .map_err(to_message)
+}
+
+#[tauri::command]
 async fn generate_ai_problem(
     state: State<'_, AppState>,
     concept_id: ConceptId,
@@ -533,6 +553,7 @@ pub fn run() {
             set_diagnosis_settings,
             set_api_key,
             diagnose_attempt,
+            explain_problem,
             generate_ai_problem
         ])
         .run(tauri::generate_context!())

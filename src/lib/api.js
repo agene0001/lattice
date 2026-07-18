@@ -27,6 +27,9 @@ export const setApiKey = (provider, key) => invoke('set_api_key', { provider, ke
 export const diagnoseAttempt = (attemptId, problemId, submittedWork) =>
   invoke('diagnose_attempt', { attemptId, problemId, submittedWork });
 
+// --- Teach when stuck: BYOK step-by-step worked solution ---
+export const explainProblem = (problemId) => invoke('explain_problem', { problemId });
+
 // --- Phase 3: AI-generated practice problems ---
 export const generateAiProblem = (conceptId, difficulty) =>
   invoke('generate_ai_problem', { conceptId, difficulty });

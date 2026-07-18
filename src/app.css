@@ -506,6 +506,40 @@ button.ghost {
   font-size: 0.82rem;
 }
 
+/* Teach when stuck: hints + worked solution */
+.stuck {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+.hint-list,
+.step-list {
+  margin: 0.6rem 0 0;
+  padding-left: 1.4rem;
+}
+.hint-list li,
+.step-list li {
+  margin: 0.15rem 0;
+}
+.hint-list li::marker {
+  color: var(--amber);
+}
+.worked {
+  margin-top: 0.9rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.worked-label {
+  display: block;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
 /* AI problem generation */
 .ai-gen {
   display: flex;

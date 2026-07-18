@@ -358,6 +358,8 @@ mod tests {
             solution: r"\tfrac{1}{2}\ln\left|\frac{x-1}{x+1}\right| + C".into(),
             generated_by: ProblemSource::Template,
             attribution: None,
+            hints: Vec::new(),
+            steps: Vec::new(),
         };
 
         let weak = find_weakest_prerequisite(
