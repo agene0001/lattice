@@ -482,6 +482,128 @@
         -4,
         4
       ]
+    },
+    {
+      "id": "poly_limit",
+      "kind": "polynomial_limit",
+      "concept": "limits",
+      "difficulty": "easy",
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -9,
+        9
+      ],
+      "c_range": [
+        -9,
+        9
+      ],
+      "x_range": [
+        -4,
+        4
+      ]
+    },
+    {
+      "id": "chain_at_point",
+      "kind": "chain_rule_at_point",
+      "concept": "chain_rule",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        3
+      ],
+      "b_range": [
+        -3,
+        3
+      ],
+      "exponent_range": [
+        2,
+        3
+      ],
+      "x_range": [
+        -2,
+        2
+      ]
+    },
+    {
+      "id": "partial_cross",
+      "kind": "partial_with_cross_term",
+      "concept": "partial_derivatives",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -6,
+        6
+      ],
+      "c_range": [
+        -6,
+        6
+      ]
+    },
+    {
+      "id": "exp_quotient",
+      "kind": "exponent_quotient",
+      "concept": "exponent_rules",
+      "difficulty": "easy",
+      "base_range": [
+        2,
+        4
+      ],
+      "exponent_range": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "fn_composition",
+      "kind": "function_composition",
+      "concept": "functions",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -6,
+        6
+      ],
+      "c_range": [
+        1,
+        5
+      ],
+      "d_range": [
+        -6,
+        6
+      ],
+      "x_range": [
+        -4,
+        4
+      ]
+    },
+    {
+      "id": "factor_quadratic",
+      "kind": "factor_quadratic",
+      "concept": "factoring",
+      "difficulty": "medium",
+      "root_range": [
+        -7,
+        7
+      ]
+    },
+    {
+      "id": "matrix_det",
+      "kind": "matrix_determinant2x2",
+      "concept": "matrices",
+      "difficulty": "easy",
+      "value_range": [
+        -6,
+        6
+      ]
     }
   ]
 }

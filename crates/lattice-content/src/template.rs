@@ -187,6 +187,45 @@ pub enum TemplateKind {
         c_range: [i64; 2],
         x_range: [i64; 2],
     },
+
+    // --- Rolled-out extra forms: calculus, algebra, linear algebra ---
+    /// Limit by direct substitution: `lim_{x→k}(a·x² + b·x + c)` → a number.
+    PolynomialLimit {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+        x_range: [i64; 2],
+    },
+    /// Chain rule evaluated at a point: `d/dx (a·x + b)^n` at `x = k` → a number.
+    ChainRuleAtPoint {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        exponent_range: [i64; 2],
+        x_range: [i64; 2],
+    },
+    /// Partial derivative with a cross term: `∂/∂x (a·x² + b·xy + c·y²)` → `2a·x + b·y`.
+    PartialWithCrossTerm {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+    },
+    /// Quotient of powers: `b^m / b^n` → `b^{m-n}`.
+    ExponentQuotient {
+        base_range: [i64; 2],
+        exponent_range: [i64; 2],
+    },
+    /// Function composition: `f(x)=a·x+b`, `g(x)=c·x+d`, find `f(g(k))` → a number.
+    FunctionComposition {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+        d_range: [i64; 2],
+        x_range: [i64; 2],
+    },
+    /// Factor a monic quadratic `x² + (p+q)·x + pq` → `(x+p)(x+q)`.
+    FactorQuadratic { root_range: [i64; 2] },
+    /// Determinant of a 2×2 integer matrix → `ad − bc`.
+    MatrixDeterminant2x2 { value_range: [i64; 2] },
 }
 
 /// A rendered instance: the problem statement and its solution, both as LaTeX.
@@ -355,6 +394,41 @@ impl TemplateKind {
                 c_range,
                 x_range,
             } => TangentLineSlope::sample(rng, a_range, b_range, c_range, x_range).render(),
+            TemplateKind::PolynomialLimit {
+                a_range,
+                b_range,
+                c_range,
+                x_range,
+            } => PolynomialLimit::sample(rng, a_range, b_range, c_range, x_range).render(),
+            TemplateKind::ChainRuleAtPoint {
+                a_range,
+                b_range,
+                exponent_range,
+                x_range,
+            } => ChainRuleAtPoint::sample(rng, a_range, b_range, exponent_range, x_range).render(),
+            TemplateKind::PartialWithCrossTerm {
+                a_range,
+                b_range,
+                c_range,
+            } => PartialWithCrossTerm::sample(rng, a_range, b_range, c_range).render(),
+            TemplateKind::ExponentQuotient {
+                base_range,
+                exponent_range,
+            } => ExponentQuotient::sample(rng, base_range, exponent_range).render(),
+            TemplateKind::FunctionComposition {
+                a_range,
+                b_range,
+                c_range,
+                d_range,
+                x_range,
+            } => FunctionComposition::sample(rng, a_range, b_range, c_range, d_range, x_range)
+                .render(),
+            TemplateKind::FactorQuadratic { root_range } => {
+                FactorQuadratic::sample(rng, root_range).render()
+            }
+            TemplateKind::MatrixDeterminant2x2 { value_range } => {
+                MatrixDeterminant2x2::sample(rng, value_range).render()
+            }
         }
     }
 }
@@ -1392,6 +1466,264 @@ impl TangentLineSlope {
     }
 }
 
+// --- Rolled-out extra forms (calculus / algebra / linear algebra) ---
+
+struct PolynomialLimit {
+    a: i64,
+    b: i64,
+    c: i64,
+    k: i64,
+}
+
+impl PolynomialLimit {
+    fn sample(rng: &mut impl Rng, a_range: &[i64; 2], b_range: &[i64; 2], c_range: &[i64; 2], x_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+            c: sample_in(rng, c_range),
+            k: sample_in(rng, x_range),
+        }
+    }
+
+    fn value(&self) -> i64 {
+        self.a * self.k * self.k + self.b * self.k + self.c
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\lim_{{x \\to {}}} \\left( {} \\right)",
+                self.k,
+                quadratic(self.a, self.b, self.c)
+            ),
+            solution: self.value().to_string(),
+        }
+    }
+}
+
+struct ChainRuleAtPoint {
+    a: i64,
+    b: i64,
+    n: i64,
+    k: i64,
+}
+
+impl ChainRuleAtPoint {
+    fn sample(rng: &mut impl Rng, a_range: &[i64; 2], b_range: &[i64; 2], exponent_range: &[i64; 2], x_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+            n: sample_in(rng, exponent_range).max(2),
+            k: sample_in(rng, x_range),
+        }
+    }
+
+    /// `d/dx (ax+b)^n` at `x=k` is `n·a·(ak+b)^(n-1)`.
+    fn slope(&self) -> i64 {
+        let inner = self.a * self.k + self.b;
+        self.n * self.a * inner.pow((self.n - 1) as u32)
+    }
+
+    /// Verification: finite difference of `(ax+b)^n` at `k` matches the formula.
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        let inner = |x: f64| self.a as f64 * x + self.b as f64;
+        let f = |x: f64| inner(x).powi(self.n as i32);
+        let k = self.k as f64;
+        let h = 1e-4;
+        let numeric = (f(k + h) - f(k - h)) / (2.0 * h);
+        let analytic = self.slope() as f64;
+        (numeric - analytic).abs() <= 1e-3 * analytic.abs().max(1.0)
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{Let }} f(x) = ({})^{{{}}}. \\text{{ Find }} f'({}).",
+                linear_lhs(self.a, self.b),
+                self.n,
+                self.k
+            ),
+            solution: self.slope().to_string(),
+        }
+    }
+}
+
+struct PartialWithCrossTerm {
+    a: i64,
+    b: i64,
+    c: i64,
+}
+
+impl PartialWithCrossTerm {
+    fn sample(rng: &mut impl Rng, a_range: &[i64; 2], b_range: &[i64; 2], c_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_nonzero(rng, b_range),
+            c: sample_nonzero(rng, c_range),
+        }
+    }
+
+    /// Verification: `∂/∂x` at a fixed `(x0, y0)` matches `2a·x0 + b·y0`.
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        let (x0, y0) = (1.3_f64, 0.7_f64);
+        let f = |x: f64| self.a as f64 * x * x + self.b as f64 * x * y0 + self.c as f64 * y0 * y0;
+        let h = 1e-4;
+        let numeric = (f(x0 + h) - f(x0 - h)) / (2.0 * h);
+        let analytic = 2.0 * self.a as f64 * x0 + self.b as f64 * y0;
+        (numeric - analytic).abs() < 1e-3
+    }
+
+    fn render(&self) -> Instance {
+        let mut solution = mono_coeff(2 * self.a, "x");
+        // b ≠ 0 by construction, so there's always a y-term.
+        solution.push_str(if self.b > 0 { " + " } else { " - " });
+        solution.push_str(&mono_coeff(self.b.abs(), "y"));
+        Instance {
+            content: format!(
+                "\\frac{{\\partial}}{{\\partial x}}\\left( {} \\right)",
+                xy_quadratic(self.a, self.b, self.c)
+            ),
+            solution,
+        }
+    }
+}
+
+struct ExponentQuotient {
+    base: i64,
+    m: i64,
+    n: i64,
+}
+
+impl ExponentQuotient {
+    fn sample(rng: &mut impl Rng, base_range: &[i64; 2], exponent_range: &[i64; 2]) -> Self {
+        let base = sample_in(rng, base_range).max(2);
+        let n = sample_in(rng, exponent_range).abs().max(1);
+        let extra = sample_in(rng, exponent_range).abs().max(1);
+        Self { base, m: n + extra, n }
+    }
+
+    /// Verification: `b^m == b^(m-n) · b^n`.
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        self.base.pow(self.m as u32)
+            == self.base.pow((self.m - self.n) as u32) * self.base.pow(self.n as u32)
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!("\\frac{{{b}^{{{m}}}}}{{{b}^{{{n}}}}}", b = self.base, m = self.m, n = self.n),
+            solution: format!("{}^{{{}}}", self.base, self.m - self.n),
+        }
+    }
+}
+
+struct FunctionComposition {
+    a: i64,
+    b: i64,
+    c: i64,
+    d: i64,
+    k: i64,
+}
+
+impl FunctionComposition {
+    fn sample(rng: &mut impl Rng, a_range: &[i64; 2], b_range: &[i64; 2], c_range: &[i64; 2], d_range: &[i64; 2], x_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+            c: sample_nonzero(rng, c_range),
+            d: sample_in(rng, d_range),
+            k: sample_in(rng, x_range),
+        }
+    }
+
+    /// `f(g(k)) = a·(c·k + d) + b`.
+    fn value(&self) -> i64 {
+        self.a * (self.c * self.k + self.d) + self.b
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "f(x) = {}, \\quad g(x) = {}. \\quad f(g({})) = \\;?",
+                linear_lhs(self.a, self.b),
+                linear_lhs(self.c, self.d),
+                self.k
+            ),
+            solution: self.value().to_string(),
+        }
+    }
+}
+
+struct FactorQuadratic {
+    p: i64,
+    q: i64,
+}
+
+impl FactorQuadratic {
+    fn sample(rng: &mut impl Rng, root_range: &[i64; 2]) -> Self {
+        let mut p = sample_nonzero(rng, root_range);
+        let mut q = sample_nonzero(rng, root_range);
+        if p > q {
+            std::mem::swap(&mut p, &mut q);
+        }
+        Self { p, q }
+    }
+
+    /// Verification: `-p` and `-q` are roots of `x² + (p+q)x + pq`.
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        let (s, prod) = (self.p + self.q, self.p * self.q);
+        let eval = |x: i64| x * x + s * x + prod;
+        eval(-self.p) == 0 && eval(-self.q) == 0
+    }
+
+    fn factor(root: i64) -> String {
+        if root >= 0 {
+            format!("(x + {root})")
+        } else {
+            format!("(x - {})", root.abs())
+        }
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{Factor }} {}",
+                quadratic(1, self.p + self.q, self.p * self.q)
+            ),
+            solution: format!("{}{}", Self::factor(self.p), Self::factor(self.q)),
+        }
+    }
+}
+
+struct MatrixDeterminant2x2 {
+    m: [[i64; 2]; 2],
+}
+
+impl MatrixDeterminant2x2 {
+    fn sample(rng: &mut impl Rng, value_range: &[i64; 2]) -> Self {
+        Self {
+            m: [
+                [sample_in(rng, value_range), sample_in(rng, value_range)],
+                [sample_in(rng, value_range), sample_in(rng, value_range)],
+            ],
+        }
+    }
+
+    fn det(&self) -> i64 {
+        self.m[0][0] * self.m[1][1] - self.m[0][1] * self.m[1][0]
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!("\\det {} = \\;?", mat2(&self.m)),
+            solution: self.det().to_string(),
+        }
+    }
+}
+
 // --- Physics instances (answers include units) ---
 
 struct AverageSpeed {
@@ -1682,6 +2014,28 @@ fn cubic(a: i64, b: i64, c: i64, d: i64) -> String {
         if coeff != 0 {
             out.push_str(if coeff > 0 { " + " } else { " - " });
             out.push_str(&monomial(coeff.abs(), exp));
+        }
+    }
+    out
+}
+
+/// A coefficient glued to a body like `x` or `xy`, eliding unit coefficients:
+/// `mono_coeff(3, "xy")` → `3xy`, `mono_coeff(1, "x")` → `x`, `-1` → `-x`.
+fn mono_coeff(coeff: i64, body: &str) -> String {
+    match coeff {
+        1 => body.to_string(),
+        -1 => format!("-{body}"),
+        n => format!("{n}{body}"),
+    }
+}
+
+/// `a·x² + b·xy + c·y²` with tidy signs and elided unit coefficients (a ≠ 0).
+fn xy_quadratic(a: i64, b: i64, c: i64) -> String {
+    let mut out = mono_coeff(a, "x^{2}");
+    for (coeff, body) in [(b, "xy"), (c, "y^{2}")] {
+        if coeff != 0 {
+            out.push_str(if coeff > 0 { " + " } else { " - " });
+            out.push_str(&mono_coeff(coeff.abs(), body));
         }
     }
     out
@@ -2043,6 +2397,33 @@ mod tests {
 
             let tan = TangentLineSlope::sample(&mut r, &[1, 5], &[-9, 9], &[-9, 9], &[-4, 4]);
             assert_eq!(tan.slope(), 2 * tan.a * tan.k + tan.b);
+        }
+    }
+
+    #[test]
+    fn rolled_out_forms_are_correct() {
+        let mut r = rng();
+        for _ in 0..1000 {
+            let lim = PolynomialLimit::sample(&mut r, &[1, 5], &[-9, 9], &[-9, 9], &[-4, 4]);
+            assert_eq!(lim.value(), lim.a * lim.k * lim.k + lim.b * lim.k + lim.c);
+
+            let chain = ChainRuleAtPoint::sample(&mut r, &[1, 3], &[-3, 3], &[2, 3], &[-2, 2]);
+            assert!(chain.holds(), "chain@point a={} b={} n={} k={}", chain.a, chain.b, chain.n, chain.k);
+
+            let part = PartialWithCrossTerm::sample(&mut r, &[1, 5], &[-6, 6], &[-6, 6]);
+            assert!(part.holds(), "partial cross-term mismatch");
+
+            let quot = ExponentQuotient::sample(&mut r, &[2, 4], &[1, 4]);
+            assert!(quot.holds() && quot.m > quot.n);
+
+            let comp = FunctionComposition::sample(&mut r, &[1, 5], &[-6, 6], &[1, 5], &[-6, 6], &[-4, 4]);
+            assert_eq!(comp.value(), comp.a * (comp.c * comp.k + comp.d) + comp.b);
+
+            let fac = FactorQuadratic::sample(&mut r, &[-7, 7]);
+            assert!(fac.holds() && fac.p <= fac.q, "roots must be actual roots, sorted");
+
+            let det = MatrixDeterminant2x2::sample(&mut r, &[-6, 6]);
+            assert_eq!(det.det(), det.m[0][0] * det.m[1][1] - det.m[0][1] * det.m[1][0]);
         }
     }
 
