@@ -229,9 +229,15 @@ pub enum TemplateKind {
 }
 
 /// A rendered instance: the problem statement and its solution, both as LaTeX.
+#[derive(Default)]
 pub struct Instance {
     pub content: String,
     pub solution: String,
+    /// Deterministic worked-solution steps (KaTeX / `$math$`), empty when a
+    /// template hasn't authored them — the UI then falls back to the AI explainer.
+    pub steps: Vec<String>,
+    /// Progressive hint ladder, empty when not authored.
+    pub hints: Vec<String>,
 }
 
 impl Template {
@@ -247,8 +253,8 @@ impl Template {
             solution: instance.solution,
             generated_by: ProblemSource::Template,
             attribution: None,
-            hints: Vec::new(),
-            steps: Vec::new(),
+            hints: instance.hints,
+            steps: instance.steps,
         }
     }
 }
@@ -463,6 +469,19 @@ impl LinearEq {
         Instance {
             content: format!("{} = {}", linear_lhs(self.a, self.b), self.c),
             solution: format!("x = {}", self.x),
+            steps: vec![
+                format!("Start with ${} = {}$.", linear_lhs(self.a, self.b), self.c),
+                format!(
+                    "Isolate the $x$ term: ${} = {}$.",
+                    linear_lhs(self.a, 0),
+                    self.c - self.b
+                ),
+                format!("Divide both sides by ${}$: $x = {}$.", self.a, self.x),
+            ],
+            hints: vec![
+                "Get the $x$ term alone on one side first.".to_string(),
+                "Then divide by the coefficient of $x$.".to_string(),
+            ],
         }
     }
 }
@@ -496,6 +515,7 @@ impl DotProduct {
                 row_vec(&self.v)
             ),
             solution: self.dot.to_string(),
+            ..Default::default()
         }
     }
 }
@@ -531,6 +551,22 @@ impl PowerRule {
         Instance {
             content: format!("\\frac{{d}}{{dx}}\\left({}\\right)", monomial(self.a, self.n)),
             solution: monomial(self.a * self.n, self.n - 1),
+            steps: vec![
+                "Power rule: multiply by the exponent, then subtract 1 from it.".to_string(),
+                format!(
+                    "Bring down the exponent: ${} \\cdot {} = {}$.",
+                    self.a,
+                    self.n,
+                    self.a * self.n
+                ),
+                format!(
+                    "Reduce the exponent by one to get ${}$.",
+                    monomial(self.a * self.n, self.n - 1)
+                ),
+            ],
+            hints: vec![format!(
+                "For $a x^n$, the derivative is $a n\\, x^{{n-1}}$."
+            )],
         }
     }
 }
@@ -558,6 +594,7 @@ impl ArithmeticEval {
         Instance {
             content: format!("{} + {} \\times {} = \\;?", self.a, self.b, self.c),
             solution: self.value().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -593,6 +630,7 @@ impl ExponentProduct {
                 n = self.n
             ),
             solution: format!("{}^{{{}}}", self.base, self.m + self.n),
+            ..Default::default()
         }
     }
 }
@@ -618,6 +656,7 @@ impl VectorSum {
         Instance {
             content: format!("{} + {}", col_vec(&self.u), col_vec(&self.v)),
             solution: components(&self.sum()),
+            ..Default::default()
         }
     }
 }
@@ -649,6 +688,7 @@ impl MatrixVectorProduct {
         Instance {
             content: format!("{} \\, {}", mat2(&self.m), col_vec(&self.v)),
             solution: components(&self.result()),
+            ..Default::default()
         }
     }
 }
@@ -682,6 +722,7 @@ impl SimpleProbability {
                 b = self.blue
             ),
             solution: format!("{p}/{q}"),
+            ..Default::default()
         }
     }
 }
@@ -715,6 +756,7 @@ impl ComplementProbability {
                 b = self.blue
             ),
             solution: format!("{p}/{q}"),
+            ..Default::default()
         }
     }
 }
@@ -744,6 +786,7 @@ impl ExpectationUniform {
                 "X \\in \\{{ {a}, {b}, {c} \\}} \\text{{, each with probability }} \\tfrac{{1}}{{3}}. \\quad E[X] = \\;?"
             ),
             solution: self.mean.to_string(),
+            ..Default::default()
         }
     }
 }
@@ -788,6 +831,7 @@ impl PolynomialDerivative {
                 quadratic(self.a, self.b, self.c)
             ),
             solution: linear_lhs(2 * self.a, self.b),
+            ..Default::default()
         }
     }
 }
@@ -814,6 +858,7 @@ impl PartialDerivative {
                 b = self.b
             ),
             solution: format!("{}x", 2 * self.a),
+            ..Default::default()
         }
     }
 }
@@ -845,6 +890,7 @@ impl ConditionalProbability {
                 s = self.subset
             ),
             solution: format!("{p}/{q}"),
+            ..Default::default()
         }
     }
 }
@@ -887,6 +933,7 @@ impl BayesNaturalFrequency {
                 h = self.healthy
             ),
             solution: format!("{p}/{q}"),
+            ..Default::default()
         }
     }
 }
@@ -920,6 +967,7 @@ impl VarianceTwoPoint {
                 hi = self.hi
             ),
             solution: self.variance().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -974,6 +1022,7 @@ impl ChainRule {
                 self.n
             ),
             solution,
+            ..Default::default()
         }
     }
 }
@@ -1010,6 +1059,7 @@ impl Gradient {
                 y0 = self.y0
             ),
             solution: components(&self.grad()),
+            ..Default::default()
         }
     }
 }
@@ -1052,6 +1102,7 @@ impl Gradient3Var {
                 z0 = self.z0
             ),
             solution: components(&self.grad()),
+            ..Default::default()
         }
     }
 }
@@ -1083,6 +1134,7 @@ impl FunctionEval {
                 self.x
             ),
             solution: self.value().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1103,6 +1155,7 @@ impl DifferenceOfSquares {
             content: format!("\\text{{Factor }} x^2 - {}", self.root * self.root),
             // Canonical order; the V1 answer check is order-sensitive (open Q6).
             solution: format!("(x - {r})(x + {r})", r = self.root),
+            ..Default::default()
         }
     }
 }
@@ -1130,6 +1183,7 @@ impl RemovableLimit {
                 r2 = self.root * self.root
             ),
             solution: self.limit().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1156,6 +1210,7 @@ impl MatrixTrace {
         Instance {
             content: format!("\\mathrm{{tr}} \\, {} = \\;?", mat2(&self.m)),
             solution: self.trace().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1189,6 +1244,7 @@ impl MatrixMultiply {
         Instance {
             content: format!("{} \\, {} = \\;?", mat2(&self.a), mat2(&self.b)),
             solution: components(&self.product()),
+            ..Default::default()
         }
     }
 }
@@ -1224,6 +1280,7 @@ impl BinomialHeads {
                 k = self.k
             ),
             solution: fraction_str(p, q),
+            ..Default::default()
         }
     }
 }
@@ -1250,6 +1307,7 @@ impl GradientDescentStep {
                 self.x0
             ),
             solution: self.next_x().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1283,6 +1341,7 @@ impl MleCoin {
                 h = self.h
             ),
             solution: fraction_str(p, q),
+            ..Default::default()
         }
     }
 }
@@ -1313,6 +1372,7 @@ impl VectorComponent {
                 vec = row_vec(&self.v)
             ),
             solution: self.value().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1368,6 +1428,7 @@ impl CubicDerivative {
             ),
             // f'(x) = 3a x² + 2b x + c.
             solution: quadratic(3 * self.a, 2 * self.b, self.c),
+            ..Default::default()
         }
     }
 }
@@ -1422,6 +1483,7 @@ impl ProductRuleDerivative {
                 linear_lhs(self.c, self.d)
             ),
             solution: linear_lhs(m, k),
+            ..Default::default()
         }
     }
 }
@@ -1462,6 +1524,7 @@ impl TangentLineSlope {
                 self.k
             ),
             solution: self.slope().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1497,6 +1560,7 @@ impl PolynomialLimit {
                 quadratic(self.a, self.b, self.c)
             ),
             solution: self.value().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1545,6 +1609,7 @@ impl ChainRuleAtPoint {
                 self.k
             ),
             solution: self.slope().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1586,6 +1651,7 @@ impl PartialWithCrossTerm {
                 xy_quadratic(self.a, self.b, self.c)
             ),
             solution,
+            ..Default::default()
         }
     }
 }
@@ -1615,6 +1681,7 @@ impl ExponentQuotient {
         Instance {
             content: format!("\\frac{{{b}^{{{m}}}}}{{{b}^{{{n}}}}}", b = self.base, m = self.m, n = self.n),
             solution: format!("{}^{{{}}}", self.base, self.m - self.n),
+            ..Default::default()
         }
     }
 }
@@ -1652,6 +1719,7 @@ impl FunctionComposition {
                 self.k
             ),
             solution: self.value().to_string(),
+            ..Default::default()
         }
     }
 }
@@ -1694,6 +1762,7 @@ impl FactorQuadratic {
                 quadratic(1, self.p + self.q, self.p * self.q)
             ),
             solution: format!("{}{}", Self::factor(self.p), Self::factor(self.q)),
+            ..Default::default()
         }
     }
 }
@@ -1720,6 +1789,20 @@ impl MatrixDeterminant2x2 {
         Instance {
             content: format!("\\det {} = \\;?", mat2(&self.m)),
             solution: self.det().to_string(),
+            steps: vec![
+                "For a 2×2 matrix, the determinant is (top-left × bottom-right) − (top-right × bottom-left).".to_string(),
+                format!(
+                    "$= ({})({}) - ({})({})$.",
+                    self.m[0][0], self.m[1][1], self.m[0][1], self.m[1][0]
+                ),
+                format!(
+                    "$= {} - {} = {}$.",
+                    self.m[0][0] * self.m[1][1],
+                    self.m[0][1] * self.m[1][0],
+                    self.det()
+                ),
+            ],
+            hints: vec!["The determinant of $\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}$ is $ad - bc$.".to_string()],
         }
     }
 }
@@ -1752,6 +1835,16 @@ impl AverageSpeed {
                 t = self.time
             ),
             solution: format!("{} m/s", self.speed),
+            steps: vec![
+                "Average speed is distance divided by time.".to_string(),
+                format!(
+                    "$\\dfrac{{{}\\,\\text{{m}}}}{{{}\\,\\text{{s}}}} = {}\\,\\text{{m/s}}$.",
+                    self.distance(),
+                    self.time,
+                    self.speed
+                ),
+            ],
+            hints: vec!["Use speed = distance ÷ time; keep the units.".to_string()],
         }
     }
 }
@@ -1781,6 +1874,7 @@ impl AccelerationFromSpeed {
                 t = self.time
             ),
             solution: format!("{} m/s^2", self.accel),
+            ..Default::default()
         }
     }
 }
@@ -1813,6 +1907,7 @@ impl FinalVelocity {
                 t = self.t
             ),
             solution: format!("{} m/s", self.final_v()),
+            ..Default::default()
         }
     }
 }
@@ -1842,6 +1937,7 @@ impl NewtonSecondLaw {
                 a = self.accel
             ),
             solution: format!("{} N", self.force()),
+            ..Default::default()
         }
     }
 }
@@ -1870,6 +1966,7 @@ impl Weight {
                 m = self.mass
             ),
             solution: format!("{} N", fmt_num(self.weight())),
+            ..Default::default()
         }
     }
 }
@@ -1896,6 +1993,7 @@ impl UnitConversion {
                 km = self.km
             ),
             solution: format!("{} m", self.metres()),
+            ..Default::default()
         }
     }
 }
@@ -2133,6 +2231,10 @@ mod tests {
         assert_eq!(p.solution, "x = 3");
         assert_eq!(p.generated_by, ProblemSource::Template);
         assert_eq!(p.concepts, vec![ConceptId::new("algebraic_manipulation")]);
+        // Authored templates carry deterministic worked steps + hints through to
+        // the Problem (the "teach when stuck" refactor), ending at the answer.
+        assert!(!p.steps.is_empty() && !p.hints.is_empty());
+        assert!(p.steps.last().unwrap().contains("x = 3"));
     }
 
     #[test]
