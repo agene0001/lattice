@@ -92,6 +92,32 @@ pub struct ConceptStatus {
     pub has_notes: bool,
 }
 
+/// A practised concept whose decay-adjusted mastery falls below this is "due for
+/// review" — the `familiar` boundary, so anything that's slipped to rusty/weak
+/// resurfaces in the daily queue.
+const REVIEW_THRESHOLD: f32 = 0.6;
+
+/// Why a concept is in today's practice queue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueKind {
+    /// Practised before but decayed below the review threshold — refresh it.
+    Review,
+    /// Prerequisites are solid and it's not started yet — ready to learn.
+    Learn,
+}
+
+/// One item in the daily practice queue (spec §5, decay-driven review).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueueItem {
+    pub concept_id: ConceptId,
+    pub label: String,
+    pub group: String,
+    pub estimated_mastery: f32,
+    pub practiceable: bool,
+    pub kind: QueueKind,
+}
+
 /// The "learn the concept" content for one concept (spec §2.2 — teach, then
 /// practice). Carries the lesson prose plus the context the Learn view needs to
 /// situate it and link straight into practice.
@@ -496,6 +522,60 @@ impl<S: Storage, M: MasteryModel> LatticeService<S, M> {
         std::fs::write(&path, markdown).map_err(|e| ServiceError::Io(e.to_string()))
     }
 
+    /// Today's practice queue: concepts **due for review** (practised but decayed
+    /// below [`REVIEW_THRESHOLD`]) first, most-decayed first, then concepts **ready
+    /// to learn** (prerequisites solid, not yet started). This is what turns the
+    /// decay model into a habit — "here's what to practise today" — instead of
+    /// making the learner choose from the whole map (spec §5).
+    pub async fn practice_queue(&self, learner: LearnerId) -> Result<Vec<QueueItem>, ServiceError> {
+        self.storage.ensure_learner(learner).await?;
+        let masteries = self.storage.load_mastery(learner).await?;
+        let now = Utc::now();
+        let estimate = |id: &ConceptId| -> f32 {
+            masteries.get(id).map_or(0.0, |m| self.model.estimated_mastery(m, now))
+        };
+        let frontier: std::collections::HashSet<ConceptId> =
+            ready_frontier(&self.graph, &masteries, &self.model, now)
+                .into_iter()
+                .collect();
+
+        let mut items: Vec<QueueItem> = Vec::new();
+        for c in self.graph.concepts() {
+            let mastery = estimate(&c.id);
+            let practised = masteries.contains_key(&c.id);
+            let practiceable = self.has_practice(&c.id);
+            let kind = if practised && mastery < REVIEW_THRESHOLD {
+                Some(QueueKind::Review)
+            } else if !practised && practiceable && frontier.contains(&c.id) {
+                Some(QueueKind::Learn)
+            } else {
+                None
+            };
+            if let Some(kind) = kind {
+                items.push(QueueItem {
+                    concept_id: c.id.clone(),
+                    label: c.label.clone(),
+                    group: c.group.clone(),
+                    estimated_mastery: mastery,
+                    practiceable,
+                    kind,
+                });
+            }
+        }
+        // Review before Learn; within review, most-decayed first; within learn,
+        // fewest prerequisites (foundations) first.
+        items.sort_by(|a, b| match (a.kind, b.kind) {
+            (QueueKind::Review, QueueKind::Learn) => std::cmp::Ordering::Less,
+            (QueueKind::Learn, QueueKind::Review) => std::cmp::Ordering::Greater,
+            (QueueKind::Review, QueueKind::Review) => a
+                .estimated_mastery
+                .partial_cmp(&b.estimated_mastery)
+                .unwrap_or(std::cmp::Ordering::Equal),
+            (QueueKind::Learn, QueueKind::Learn) => a.label.cmp(&b.label),
+        });
+        Ok(items)
+    }
+
     pub fn subject_id(&self) -> &SubjectId {
         &self.subject.id
     }
@@ -864,6 +944,37 @@ mod tests {
         assert!(outcome.is_correct);
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn practice_queue_separates_review_from_learn() {
+        let svc = service().await;
+        let learner = LearnerId::new();
+
+        // Nothing practised yet: the queue is all "learn" (ready frontier).
+        let q = svc.practice_queue(learner).await.unwrap();
+        assert!(!q.is_empty(), "a fresh learner should have things ready to learn");
+        assert!(q.iter().all(|i| i.kind == QueueKind::Learn));
+
+        // Fail a concept → it gets a low-mastery record → surfaces as review.
+        let p = svc.next_problem(learner).await.unwrap();
+        let concept = p.concepts[0].clone();
+        svc.submit_attempt(learner, p.id, "definitely wrong".into())
+            .await
+            .unwrap();
+        let q = svc.practice_queue(learner).await.unwrap();
+        assert!(
+            q.iter()
+                .any(|i| i.concept_id == concept && i.kind == QueueKind::Review),
+            "a just-failed concept should be due for review"
+        );
+        // Review items sort ahead of learn items.
+        if let (Some(first_review), Some(first_learn)) = (
+            q.iter().position(|i| i.kind == QueueKind::Review),
+            q.iter().position(|i| i.kind == QueueKind::Learn),
+        ) {
+            assert!(first_review < first_learn, "reviews come before new material");
+        }
     }
 
     #[tokio::test]

@@ -9,6 +9,7 @@
     resolveRefs,
     subjectInfo,
     conceptMap,
+    practiceQueue,
     nextProblem,
     submitAttempt,
     practiceConcept,
@@ -28,7 +29,8 @@
   let subject = $state(null);
   let subjects = $state([]); // all available subjects (the switcher)
   let currentSubjectId = $state(null);
-  let view = $state('practice'); // 'practice' | 'map'
+  let view = $state('today'); // 'today' | 'practice' | 'learn' | 'map' | 'settings'
+  let queue = $state([]); // today's decay-driven practice queue
   let problem = $state(null);
   let work = $state('');
   let outcome = $state(null);
@@ -120,8 +122,12 @@
   }
 
   async function refreshMap() {
-    concepts = await conceptMap();
+    [concepts, queue] = await Promise.all([conceptMap(), practiceQueue()]);
   }
+
+  // Today's queue, split for display.
+  let reviewItems = $derived(queue.filter((i) => i.kind === 'review'));
+  let learnItems = $derived(queue.filter((i) => i.kind === 'learn'));
 
   async function loadProblem() {
     busy = true;
@@ -514,6 +520,10 @@
       </div>
     </div>
     <nav>
+      <button class:active={view === 'today'} onclick={() => (view = 'today')}>
+        Today
+        {#if reviewItems.length}<span class="due-badge">{reviewItems.length}</span>{/if}
+      </button>
       <button class:active={view === 'practice'} onclick={() => (view = 'practice')}>
         Practice
       </button>
@@ -542,7 +552,70 @@
     <div class="banner notice">{notice}</div>
   {/if}
 
-  {#if view === 'practice'}
+  {#if view === 'today'}
+    <main class="today">
+      <p class="muted intro">
+        Your practice queue for {subject?.name ?? 'this subject'} — what the decay model says
+        is worth doing right now. Reviews first, then new material you're ready for.
+      </p>
+
+      {#if queue.length === 0}
+        <section class="card empty-queue">
+          <h2>All caught up ✓</h2>
+          <p class="muted">
+            Nothing is due for review and there's no new frontier to unlock right now.
+            Practise anything from the <button class="link" onclick={() => (view = 'map')}>Concept
+            map</button>, or come back later once today's work has had time to settle.
+          </p>
+        </section>
+      {:else}
+        {#if reviewItems.length}
+          <section class="group">
+            <div class="group-head">
+              <h3>Due for review</h3>
+              <span class="group-avg weak">{reviewItems.length}</span>
+            </div>
+            <p class="queue-sub muted">Practised before, but decayed — refresh these first.</p>
+            <ul class="queue-list">
+              {#each reviewItems as item}
+                <li>
+                  <button class="queue-row" onclick={() => practice(item.concept_id)}>
+                    <span class="queue-name">{item.label}</span>
+                    <span class="queue-meta">
+                      <span class="muted">{item.group}</span>
+                      <span class="pctlabel {masteryClass(item.estimated_mastery)}">
+                        {pct(item.estimated_mastery)}%
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
+
+        {#if learnItems.length}
+          <section class="group">
+            <div class="group-head">
+              <h3>Ready to learn</h3>
+              <span class="group-avg familiar">{learnItems.length}</span>
+            </div>
+            <p class="queue-sub muted">Prerequisites are solid — these are unlocked and new.</p>
+            <ul class="queue-list">
+              {#each learnItems as item}
+                <li>
+                  <button class="queue-row" onclick={() => practice(item.concept_id)}>
+                    <span class="queue-name">{item.label}</span>
+                    <span class="queue-meta"><span class="muted">{item.group}</span></span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
+      {/if}
+    </main>
+  {:else if view === 'practice'}
     <main class="practice">
       {#if problem}
         <section class="card problem">

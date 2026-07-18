@@ -9,6 +9,8 @@ export const selectSubject = (subjectId) => invoke('select_subject', { subjectId
 export const resolveRefs = (refs) => invoke('resolve_refs', { refs });
 export const subjectInfo = () => invoke('subject_info');
 export const conceptMap = () => invoke('concept_map');
+// Today's practice queue: {concept_id,label,group,estimated_mastery,practiceable,kind:'review'|'learn'}[]
+export const practiceQueue = () => invoke('practice_queue');
 export const nextProblem = () => invoke('next_problem');
 export const submitAttempt = (problemId, submittedWork) =>
   invoke('submit_attempt', { problemId, submittedWork });

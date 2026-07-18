@@ -14,7 +14,8 @@ use lattice_core::{
 };
 use lattice_graph::{Bkt, BktParams};
 use lattice_service::{
-    AttemptOutcome, ConceptStatus, LatticeService, Lesson, Provider, ProviderConfig, ServiceError,
+    AttemptOutcome, ConceptStatus, LatticeService, Lesson, Provider, ProviderConfig, QueueItem,
+    ServiceError,
 };
 use lattice_storage::SqliteStorage;
 use serde::{Deserialize, Serialize};
@@ -133,6 +134,15 @@ async fn subject_info(state: State<'_, AppState>) -> Result<SubjectInfo, String>
         name: service.subject_name().to_string(),
         groups: service.groups().to_vec(),
     })
+}
+
+#[tauri::command]
+async fn practice_queue(state: State<'_, AppState>) -> Result<Vec<QueueItem>, String> {
+    state
+        .active_service()?
+        .practice_queue(state.learner)
+        .await
+        .map_err(to_message)
 }
 
 #[tauri::command]
@@ -540,6 +550,7 @@ pub fn run() {
             select_subject,
             resolve_refs,
             subject_info,
+            practice_queue,
             concept_map,
             next_problem,
             submit_attempt,
