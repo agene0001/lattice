@@ -1,78 +1,487 @@
 {
   "templates": [
-    { "id": "arith_easy", "kind": "arithmetic_eval", "concept": "arithmetic", "difficulty": "easy",
-      "a_range": [1, 20], "b_range": [2, 9], "c_range": [2, 9] },
-
-    { "id": "lin_eq_easy", "kind": "linear_equation", "concept": "algebraic_manipulation", "difficulty": "easy",
-      "a_range": [1, 5], "x_range": [-6, 6], "b_range": [-9, 9] },
-    { "id": "lin_eq_medium", "kind": "linear_equation", "concept": "algebraic_manipulation", "difficulty": "medium",
-      "a_range": [-9, 9], "x_range": [-12, 12], "b_range": [-20, 20] },
-
-    { "id": "exp_prod_easy", "kind": "exponent_product", "concept": "exponent_rules", "difficulty": "easy",
-      "base_range": [2, 5], "exponent_range": [1, 4] },
-
-    { "id": "vec_sum_easy", "kind": "vector_sum", "concept": "vector_operations", "difficulty": "easy",
-      "dim": 2, "value_range": [-5, 5] },
-    { "id": "vec_sum_medium", "kind": "vector_sum", "concept": "vector_operations", "difficulty": "medium",
-      "dim": 3, "value_range": [-8, 8] },
-
-    { "id": "dot_easy", "kind": "dot_product", "concept": "dot_product", "difficulty": "easy",
-      "dim": 2, "value_range": [-4, 4] },
-    { "id": "dot_medium", "kind": "dot_product", "concept": "dot_product", "difficulty": "medium",
-      "dim": 3, "value_range": [-6, 6] },
-
-    { "id": "matvec_medium", "kind": "matrix_vector_product", "concept": "matrix_vector_product", "difficulty": "medium",
-      "value_range": [-4, 4] },
-
-    { "id": "power_easy", "kind": "power_rule_derivative", "concept": "power_rule", "difficulty": "easy",
-      "coeff_range": [1, 6], "exponent_range": [2, 5] },
-    { "id": "poly_deriv_easy", "kind": "polynomial_derivative", "concept": "derivatives", "difficulty": "easy",
-      "a_range": [1, 5], "b_range": [-9, 9], "c_range": [-9, 9] },
-    { "id": "partial_medium", "kind": "partial_derivative", "concept": "partial_derivatives", "difficulty": "medium",
-      "a_range": [2, 6], "b_range": [2, 6] },
-
-    { "id": "prob_easy", "kind": "simple_probability", "concept": "probability_basics", "difficulty": "easy",
-      "red_range": [1, 5], "blue_range": [1, 5] },
-    { "id": "prob_medium", "kind": "simple_probability", "concept": "probability_basics", "difficulty": "medium",
-      "red_range": [2, 12], "blue_range": [2, 12] },
-    { "id": "prob_complement_medium", "kind": "complement_probability", "concept": "probability_basics", "difficulty": "medium",
-      "red_range": [1, 9], "blue_range": [1, 9] },
-    { "id": "expectation_easy", "kind": "expectation_uniform", "concept": "expectation", "difficulty": "easy",
-      "mean_range": [2, 12], "spread_range": [-4, 4] },
-    { "id": "variance_easy", "kind": "variance_two_point", "concept": "variance", "difficulty": "easy",
-      "mean_range": [0, 10], "spread_range": [1, 6] },
-    { "id": "cond_prob_easy", "kind": "conditional_probability", "concept": "conditional_probability", "difficulty": "easy",
-      "total_range": [2, 9] },
-    { "id": "bayes_medium", "kind": "bayes_natural_frequency", "concept": "bayes_theorem", "difficulty": "medium",
-      "count_range": [1, 8] },
-
-    { "id": "chain_medium", "kind": "chain_rule", "concept": "chain_rule", "difficulty": "medium",
-      "a_range": [1, 4], "b_range": [1, 6], "exponent_range": [2, 3] },
-    { "id": "gradient_easy", "kind": "gradient", "concept": "gradients", "difficulty": "easy",
-      "coeff_range": [1, 3], "point_range": [-2, 2] },
-    { "id": "gradient_medium", "kind": "gradient", "concept": "gradients", "difficulty": "medium",
-      "coeff_range": [2, 5], "point_range": [-3, 3] },
-    { "id": "gradient_hard", "kind": "gradient3_var", "concept": "gradients", "difficulty": "hard",
-      "coeff_range": [2, 6], "point_range": [-4, 4] },
-
-    { "id": "func_eval_easy", "kind": "function_eval", "concept": "functions", "difficulty": "easy",
-      "a_range": [1, 6], "b_range": [-9, 9], "x_range": [-6, 6] },
-    { "id": "factoring_easy", "kind": "difference_of_squares", "concept": "factoring", "difficulty": "easy",
-      "root_range": [1, 9] },
-    { "id": "limit_medium", "kind": "removable_limit", "concept": "limits", "difficulty": "medium",
-      "root_range": [1, 9] },
-    { "id": "trace_easy", "kind": "matrix_trace", "concept": "matrices", "difficulty": "easy",
-      "value_range": [-6, 6] },
-    { "id": "matmul_hard", "kind": "matrix_multiply", "concept": "matrix_multiplication", "difficulty": "hard",
-      "value_range": [-4, 4] },
-    { "id": "binom_medium", "kind": "binomial_heads", "concept": "random_variables", "difficulty": "medium",
-      "flips_range": [2, 4] },
-    { "id": "gd_step_medium", "kind": "gradient_descent_step", "concept": "gradient_descent", "difficulty": "medium",
-      "value_range": [1, 8] },
-    { "id": "mle_medium", "kind": "mle_coin", "concept": "maximum_likelihood", "difficulty": "medium",
-      "flips_range": [2, 9] },
-
-    { "id": "vec_component_easy", "kind": "vector_component", "concept": "vectors", "difficulty": "easy",
-      "dim": 4, "value_range": [-9, 9] }
+    {
+      "id": "arith_easy",
+      "kind": "arithmetic_eval",
+      "concept": "arithmetic",
+      "difficulty": "easy",
+      "a_range": [
+        1,
+        20
+      ],
+      "b_range": [
+        2,
+        9
+      ],
+      "c_range": [
+        2,
+        9
+      ]
+    },
+    {
+      "id": "lin_eq_easy",
+      "kind": "linear_equation",
+      "concept": "algebraic_manipulation",
+      "difficulty": "easy",
+      "a_range": [
+        1,
+        5
+      ],
+      "x_range": [
+        -6,
+        6
+      ],
+      "b_range": [
+        -9,
+        9
+      ]
+    },
+    {
+      "id": "lin_eq_medium",
+      "kind": "linear_equation",
+      "concept": "algebraic_manipulation",
+      "difficulty": "medium",
+      "a_range": [
+        -9,
+        9
+      ],
+      "x_range": [
+        -12,
+        12
+      ],
+      "b_range": [
+        -20,
+        20
+      ]
+    },
+    {
+      "id": "exp_prod_easy",
+      "kind": "exponent_product",
+      "concept": "exponent_rules",
+      "difficulty": "easy",
+      "base_range": [
+        2,
+        5
+      ],
+      "exponent_range": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "vec_sum_easy",
+      "kind": "vector_sum",
+      "concept": "vector_operations",
+      "difficulty": "easy",
+      "dim": 2,
+      "value_range": [
+        -5,
+        5
+      ]
+    },
+    {
+      "id": "vec_sum_medium",
+      "kind": "vector_sum",
+      "concept": "vector_operations",
+      "difficulty": "medium",
+      "dim": 3,
+      "value_range": [
+        -8,
+        8
+      ]
+    },
+    {
+      "id": "dot_easy",
+      "kind": "dot_product",
+      "concept": "dot_product",
+      "difficulty": "easy",
+      "dim": 2,
+      "value_range": [
+        -4,
+        4
+      ]
+    },
+    {
+      "id": "dot_medium",
+      "kind": "dot_product",
+      "concept": "dot_product",
+      "difficulty": "medium",
+      "dim": 3,
+      "value_range": [
+        -6,
+        6
+      ]
+    },
+    {
+      "id": "matvec_medium",
+      "kind": "matrix_vector_product",
+      "concept": "matrix_vector_product",
+      "difficulty": "medium",
+      "value_range": [
+        -4,
+        4
+      ]
+    },
+    {
+      "id": "power_easy",
+      "kind": "power_rule_derivative",
+      "concept": "power_rule",
+      "difficulty": "easy",
+      "coeff_range": [
+        1,
+        6
+      ],
+      "exponent_range": [
+        2,
+        5
+      ]
+    },
+    {
+      "id": "poly_deriv_easy",
+      "kind": "polynomial_derivative",
+      "concept": "derivatives",
+      "difficulty": "easy",
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -9,
+        9
+      ],
+      "c_range": [
+        -9,
+        9
+      ]
+    },
+    {
+      "id": "partial_medium",
+      "kind": "partial_derivative",
+      "concept": "partial_derivatives",
+      "difficulty": "medium",
+      "a_range": [
+        2,
+        6
+      ],
+      "b_range": [
+        2,
+        6
+      ]
+    },
+    {
+      "id": "prob_easy",
+      "kind": "simple_probability",
+      "concept": "probability_basics",
+      "difficulty": "easy",
+      "red_range": [
+        1,
+        5
+      ],
+      "blue_range": [
+        1,
+        5
+      ]
+    },
+    {
+      "id": "prob_medium",
+      "kind": "simple_probability",
+      "concept": "probability_basics",
+      "difficulty": "medium",
+      "red_range": [
+        2,
+        12
+      ],
+      "blue_range": [
+        2,
+        12
+      ]
+    },
+    {
+      "id": "prob_complement_medium",
+      "kind": "complement_probability",
+      "concept": "probability_basics",
+      "difficulty": "medium",
+      "red_range": [
+        1,
+        9
+      ],
+      "blue_range": [
+        1,
+        9
+      ]
+    },
+    {
+      "id": "expectation_easy",
+      "kind": "expectation_uniform",
+      "concept": "expectation",
+      "difficulty": "easy",
+      "mean_range": [
+        2,
+        12
+      ],
+      "spread_range": [
+        -4,
+        4
+      ]
+    },
+    {
+      "id": "variance_easy",
+      "kind": "variance_two_point",
+      "concept": "variance",
+      "difficulty": "easy",
+      "mean_range": [
+        0,
+        10
+      ],
+      "spread_range": [
+        1,
+        6
+      ]
+    },
+    {
+      "id": "cond_prob_easy",
+      "kind": "conditional_probability",
+      "concept": "conditional_probability",
+      "difficulty": "easy",
+      "total_range": [
+        2,
+        9
+      ]
+    },
+    {
+      "id": "bayes_medium",
+      "kind": "bayes_natural_frequency",
+      "concept": "bayes_theorem",
+      "difficulty": "medium",
+      "count_range": [
+        1,
+        8
+      ]
+    },
+    {
+      "id": "chain_medium",
+      "kind": "chain_rule",
+      "concept": "chain_rule",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        4
+      ],
+      "b_range": [
+        1,
+        6
+      ],
+      "exponent_range": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "gradient_easy",
+      "kind": "gradient",
+      "concept": "gradients",
+      "difficulty": "easy",
+      "coeff_range": [
+        1,
+        3
+      ],
+      "point_range": [
+        -2,
+        2
+      ]
+    },
+    {
+      "id": "gradient_medium",
+      "kind": "gradient",
+      "concept": "gradients",
+      "difficulty": "medium",
+      "coeff_range": [
+        2,
+        5
+      ],
+      "point_range": [
+        -3,
+        3
+      ]
+    },
+    {
+      "id": "gradient_hard",
+      "kind": "gradient3_var",
+      "concept": "gradients",
+      "difficulty": "hard",
+      "coeff_range": [
+        2,
+        6
+      ],
+      "point_range": [
+        -4,
+        4
+      ]
+    },
+    {
+      "id": "func_eval_easy",
+      "kind": "function_eval",
+      "concept": "functions",
+      "difficulty": "easy",
+      "a_range": [
+        1,
+        6
+      ],
+      "b_range": [
+        -9,
+        9
+      ],
+      "x_range": [
+        -6,
+        6
+      ]
+    },
+    {
+      "id": "factoring_easy",
+      "kind": "difference_of_squares",
+      "concept": "factoring",
+      "difficulty": "easy",
+      "root_range": [
+        1,
+        9
+      ]
+    },
+    {
+      "id": "limit_medium",
+      "kind": "removable_limit",
+      "concept": "limits",
+      "difficulty": "medium",
+      "root_range": [
+        1,
+        9
+      ]
+    },
+    {
+      "id": "trace_easy",
+      "kind": "matrix_trace",
+      "concept": "matrices",
+      "difficulty": "easy",
+      "value_range": [
+        -6,
+        6
+      ]
+    },
+    {
+      "id": "matmul_hard",
+      "kind": "matrix_multiply",
+      "concept": "matrix_multiplication",
+      "difficulty": "hard",
+      "value_range": [
+        -4,
+        4
+      ]
+    },
+    {
+      "id": "binom_medium",
+      "kind": "binomial_heads",
+      "concept": "random_variables",
+      "difficulty": "medium",
+      "flips_range": [
+        2,
+        4
+      ]
+    },
+    {
+      "id": "gd_step_medium",
+      "kind": "gradient_descent_step",
+      "concept": "gradient_descent",
+      "difficulty": "medium",
+      "value_range": [
+        1,
+        8
+      ]
+    },
+    {
+      "id": "mle_medium",
+      "kind": "mle_coin",
+      "concept": "maximum_likelihood",
+      "difficulty": "medium",
+      "flips_range": [
+        2,
+        9
+      ]
+    },
+    {
+      "id": "vec_component_easy",
+      "kind": "vector_component",
+      "concept": "vectors",
+      "difficulty": "easy",
+      "dim": 4,
+      "value_range": [
+        -9,
+        9
+      ]
+    },
+    {
+      "id": "cubic_deriv",
+      "kind": "cubic_derivative",
+      "concept": "power_rule",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        4
+      ],
+      "b_range": [
+        -6,
+        6
+      ],
+      "c_range": [
+        -9,
+        9
+      ],
+      "d_range": [
+        -9,
+        9
+      ]
+    },
+    {
+      "id": "product_rule",
+      "kind": "product_rule_derivative",
+      "concept": "derivatives",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -6,
+        6
+      ],
+      "c_range": [
+        1,
+        5
+      ],
+      "d_range": [
+        -6,
+        6
+      ]
+    },
+    {
+      "id": "tangent_slope",
+      "kind": "tangent_line_slope",
+      "concept": "derivatives",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -9,
+        9
+      ],
+      "c_range": [
+        -9,
+        9
+      ],
+      "x_range": [
+        -4,
+        4
+      ]
+    }
   ]
 }

@@ -163,6 +163,30 @@ pub enum TemplateKind {
     Weight { mass_range: [i64; 2] },
     /// Unit conversion: kilometres to metres. Answer in `m`.
     UnitConversion { value_range: [i64; 2] },
+
+    // --- Calculus: extra derivative *forms* (variety fights template-memorizing) ---
+    /// Derivative of a cubic `a·x³ + b·x² + c·x + d` → `3a·x² + 2b·x + c`.
+    CubicDerivative {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+        d_range: [i64; 2],
+    },
+    /// Product rule: `d/dx[(a·x + b)(c·x + d)]` → `2ac·x + (ad + bc)`.
+    ProductRuleDerivative {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+        d_range: [i64; 2],
+    },
+    /// Word problem: slope of the tangent to `f(x) = a·x² + b·x + c` at `x = k`,
+    /// i.e. `f'(k) = 2a·k + b` — a single number, testing derivative + evaluation.
+    TangentLineSlope {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+        x_range: [i64; 2],
+    },
 }
 
 /// A rendered instance: the problem statement and its solution, both as LaTeX.
@@ -313,6 +337,24 @@ impl TemplateKind {
             TemplateKind::UnitConversion { value_range } => {
                 UnitConversion::sample(rng, value_range).render()
             }
+            TemplateKind::CubicDerivative {
+                a_range,
+                b_range,
+                c_range,
+                d_range,
+            } => CubicDerivative::sample(rng, a_range, b_range, c_range, d_range).render(),
+            TemplateKind::ProductRuleDerivative {
+                a_range,
+                b_range,
+                c_range,
+                d_range,
+            } => ProductRuleDerivative::sample(rng, a_range, b_range, c_range, d_range).render(),
+            TemplateKind::TangentLineSlope {
+                a_range,
+                b_range,
+                c_range,
+                x_range,
+            } => TangentLineSlope::sample(rng, a_range, b_range, c_range, x_range).render(),
         }
     }
 }
@@ -1201,6 +1243,155 @@ impl VectorComponent {
     }
 }
 
+// --- Calculus: extra derivative forms ---
+
+struct CubicDerivative {
+    a: i64,
+    b: i64,
+    c: i64,
+    d: i64,
+}
+
+impl CubicDerivative {
+    fn sample(
+        rng: &mut impl Rng,
+        a_range: &[i64; 2],
+        b_range: &[i64; 2],
+        c_range: &[i64; 2],
+        d_range: &[i64; 2],
+    ) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+            c: sample_in(rng, c_range),
+            d: sample_in(rng, d_range),
+        }
+    }
+
+    /// Verification: analytic `3a·x² + 2b·x + c` matches a finite difference of
+    /// the cubic.
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        let f = |x: f64| {
+            (self.a as f64) * x * x * x + (self.b as f64) * x * x + (self.c as f64) * x
+                + (self.d as f64)
+        };
+        let f_prime = |x: f64| {
+            3.0 * (self.a as f64) * x * x + 2.0 * (self.b as f64) * x + (self.c as f64)
+        };
+        let h = 1e-4;
+        [0.4_f64, 1.2, 2.3].iter().all(|&x| {
+            let numeric = (f(x + h) - f(x - h)) / (2.0 * h);
+            (numeric - f_prime(x)).abs() < 1e-2
+        })
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\frac{{d}}{{dx}}\\left( {} \\right)",
+                cubic(self.a, self.b, self.c, self.d)
+            ),
+            // f'(x) = 3a x² + 2b x + c.
+            solution: quadratic(3 * self.a, 2 * self.b, self.c),
+        }
+    }
+}
+
+struct ProductRuleDerivative {
+    a: i64,
+    b: i64,
+    c: i64,
+    d: i64,
+}
+
+impl ProductRuleDerivative {
+    fn sample(
+        rng: &mut impl Rng,
+        a_range: &[i64; 2],
+        b_range: &[i64; 2],
+        c_range: &[i64; 2],
+        d_range: &[i64; 2],
+    ) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+            c: sample_nonzero(rng, c_range),
+            d: sample_in(rng, d_range),
+        }
+    }
+
+    /// `d/dx[(ax+b)(cx+d)] = 2ac·x + (ad + bc)`.
+    fn deriv_coeffs(&self) -> (i64, i64) {
+        (2 * self.a * self.c, self.a * self.d + self.b * self.c)
+    }
+
+    /// Verification: finite difference of the product matches `2ac·x + (ad+bc)`.
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        let f = |x: f64| ((self.a as f64) * x + self.b as f64) * ((self.c as f64) * x + self.d as f64);
+        let (m, k) = self.deriv_coeffs();
+        let f_prime = |x: f64| (m as f64) * x + (k as f64);
+        let h = 1e-4;
+        [0.3_f64, 1.1, 2.2].iter().all(|&x| {
+            let numeric = (f(x + h) - f(x - h)) / (2.0 * h);
+            (numeric - f_prime(x)).abs() < 1e-2
+        })
+    }
+
+    fn render(&self) -> Instance {
+        let (m, k) = self.deriv_coeffs();
+        Instance {
+            content: format!(
+                "\\frac{{d}}{{dx}}\\left( ({})({}) \\right)",
+                linear_lhs(self.a, self.b),
+                linear_lhs(self.c, self.d)
+            ),
+            solution: linear_lhs(m, k),
+        }
+    }
+}
+
+struct TangentLineSlope {
+    a: i64,
+    b: i64,
+    c: i64,
+    k: i64,
+}
+
+impl TangentLineSlope {
+    fn sample(
+        rng: &mut impl Rng,
+        a_range: &[i64; 2],
+        b_range: &[i64; 2],
+        c_range: &[i64; 2],
+        x_range: &[i64; 2],
+    ) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+            c: sample_in(rng, c_range),
+            k: sample_in(rng, x_range),
+        }
+    }
+
+    /// Slope of the tangent at `x = k` is `f'(k) = 2a·k + b`.
+    fn slope(&self) -> i64 {
+        2 * self.a * self.k + self.b
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{What is the slope of the tangent line to }} f(x) = {} \\text{{ at }} x = {}?",
+                quadratic(self.a, self.b, self.c),
+                self.k
+            ),
+            solution: self.slope().to_string(),
+        }
+    }
+}
+
 // --- Physics instances (answers include units) ---
 
 struct AverageSpeed {
@@ -1480,6 +1671,18 @@ fn quadratic(a: i64, b: i64, c: i64) -> String {
     }
     if c != 0 {
         out.push_str(&format!(" {} {}", if c > 0 { "+" } else { "-" }, c.abs()));
+    }
+    out
+}
+
+/// `a·x³ + b·x² + c·x + d` with tidy signs and elided zero terms (assumes a ≠ 0).
+fn cubic(a: i64, b: i64, c: i64, d: i64) -> String {
+    let mut out = monomial(a, 3);
+    for (coeff, exp) in [(b, 2), (c, 1), (d, 0)] {
+        if coeff != 0 {
+            out.push_str(if coeff > 0 { " + " } else { " - " });
+            out.push_str(&monomial(coeff.abs(), exp));
+        }
     }
     out
 }
@@ -1826,6 +2029,27 @@ mod tests {
             assert!(inst.h >= 1 && inst.h <= inst.n);
             assert_eq!(gcd(p, q), 1);
         }
+    }
+
+    #[test]
+    fn derivative_forms_agree_with_numeric_derivatives() {
+        let mut r = rng();
+        for _ in 0..1000 {
+            let cubic = CubicDerivative::sample(&mut r, &[1, 5], &[-6, 6], &[-9, 9], &[-9, 9]);
+            assert!(cubic.holds(), "a={}, b={}, c={}", cubic.a, cubic.b, cubic.c);
+
+            let prod = ProductRuleDerivative::sample(&mut r, &[1, 5], &[-6, 6], &[1, 5], &[-6, 6]);
+            assert!(prod.holds(), "product rule mismatch");
+
+            let tan = TangentLineSlope::sample(&mut r, &[1, 5], &[-9, 9], &[-9, 9], &[-4, 4]);
+            assert_eq!(tan.slope(), 2 * tan.a * tan.k + tan.b);
+        }
+    }
+
+    #[test]
+    fn cubic_renders_tidily() {
+        assert_eq!(cubic(1, 0, -3, 2), "x^{3} - 3x + 2");
+        assert_eq!(cubic(2, -1, 0, 0), "2x^{3} - x^{2}");
     }
 
     #[test]
