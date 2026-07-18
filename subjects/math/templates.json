@@ -604,6 +604,59 @@
         -6,
         6
       ]
+    },
+    {
+      "id": "exp_linearity",
+      "kind": "linearity_of_expectation",
+      "concept": "expectation",
+      "difficulty": "medium",
+      "mean_range": [
+        -9,
+        9
+      ],
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -9,
+        9
+      ]
+    },
+    {
+      "id": "var_scaling",
+      "kind": "variance_scaling",
+      "concept": "variance",
+      "difficulty": "medium",
+      "var_range": [
+        1,
+        12
+      ],
+      "a_range": [
+        -5,
+        5
+      ]
+    },
+    {
+      "id": "vec_magnitude",
+      "kind": "vector_magnitude_squared",
+      "concept": "vectors",
+      "difficulty": "easy",
+      "dim": 3,
+      "value_range": [
+        -6,
+        6
+      ]
+    },
+    {
+      "id": "uniform_pmf",
+      "kind": "uniform_pmf",
+      "concept": "random_variables",
+      "difficulty": "easy",
+      "sides_range": [
+        2,
+        12
+      ]
     }
   ]
 }

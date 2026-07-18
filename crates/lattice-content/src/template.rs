@@ -226,6 +226,23 @@ pub enum TemplateKind {
     FactorQuadratic { root_range: [i64; 2] },
     /// Determinant of a 2×2 integer matrix → `ad − bc`.
     MatrixDeterminant2x2 { value_range: [i64; 2] },
+
+    // --- #2 rollout: second forms for prob/stats + vectors ---
+    /// Linearity of expectation: given `E[X] = m`, find `E[aX + b] = a·m + b`.
+    LinearityOfExpectation {
+        mean_range: [i64; 2],
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+    },
+    /// Variance scaling: given `Var(X) = v`, find `Var(aX) = a²·v`.
+    VarianceScaling {
+        var_range: [i64; 2],
+        a_range: [i64; 2],
+    },
+    /// Squared magnitude of an integer vector: `‖v‖² = Σ vᵢ²`.
+    VectorMagnitudeSquared { dim: usize, value_range: [i64; 2] },
+    /// PMF of a fair n-sided die: `P(X = k) = 1/n`.
+    UniformPmf { sides_range: [i64; 2] },
 }
 
 /// A rendered instance: the problem statement and its solution, both as LaTeX.
@@ -434,6 +451,20 @@ impl TemplateKind {
             }
             TemplateKind::MatrixDeterminant2x2 { value_range } => {
                 MatrixDeterminant2x2::sample(rng, value_range).render()
+            }
+            TemplateKind::LinearityOfExpectation {
+                mean_range,
+                a_range,
+                b_range,
+            } => LinearityOfExpectation::sample(rng, mean_range, a_range, b_range).render(),
+            TemplateKind::VarianceScaling { var_range, a_range } => {
+                VarianceScaling::sample(rng, var_range, a_range).render()
+            }
+            TemplateKind::VectorMagnitudeSquared { dim, value_range } => {
+                VectorMagnitudeSquared::sample(rng, *dim, value_range).render()
+            }
+            TemplateKind::UniformPmf { sides_range } => {
+                UniformPmf::sample(rng, sides_range).render()
             }
         }
     }
@@ -1807,6 +1838,152 @@ impl MatrixDeterminant2x2 {
     }
 }
 
+struct LinearityOfExpectation {
+    m: i64,
+    a: i64,
+    b: i64,
+}
+
+impl LinearityOfExpectation {
+    fn sample(rng: &mut impl Rng, mean_range: &[i64; 2], a_range: &[i64; 2], b_range: &[i64; 2]) -> Self {
+        Self {
+            m: sample_in(rng, mean_range),
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+        }
+    }
+
+    fn value(&self) -> i64 {
+        self.a * self.m + self.b
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{If }} E[X] = {}, \\text{{ what is }} E[{}]?",
+                self.m,
+                linear_lhs(self.a, self.b)
+            ),
+            solution: self.value().to_string(),
+            steps: vec![
+                "Expectation is linear: $E[aX + b] = a\\,E[X] + b$.".to_string(),
+                format!(
+                    "$= ({})({}) + ({}) = {}$.",
+                    self.a,
+                    self.m,
+                    self.b,
+                    self.value()
+                ),
+            ],
+            hints: vec!["Pull the constant out: $E[aX+b] = a\\,E[X] + b$.".to_string()],
+        }
+    }
+}
+
+struct VarianceScaling {
+    v: i64,
+    a: i64,
+}
+
+impl VarianceScaling {
+    fn sample(rng: &mut impl Rng, var_range: &[i64; 2], a_range: &[i64; 2]) -> Self {
+        Self {
+            v: sample_in(rng, var_range).abs().max(1),
+            a: sample_nonzero(rng, a_range),
+        }
+    }
+
+    fn value(&self) -> i64 {
+        self.a * self.a * self.v
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{If }} \\mathrm{{Var}}(X) = {}, \\text{{ what is }} \\mathrm{{Var}}({}X)?",
+                self.v, self.a
+            ),
+            solution: self.value().to_string(),
+            steps: vec![
+                "Scaling by $a$ scales variance by $a^2$: $\\mathrm{Var}(aX) = a^2\\,\\mathrm{Var}(X)$.".to_string(),
+                format!("$= ({})^2 \\cdot {} = {}$.", self.a, self.v, self.value()),
+            ],
+            hints: vec!["Variance scales by $a^2$ — the sign of $a$ doesn't matter.".to_string()],
+        }
+    }
+}
+
+struct VectorMagnitudeSquared {
+    v: Vec<i64>,
+}
+
+impl VectorMagnitudeSquared {
+    fn sample(rng: &mut impl Rng, dim: usize, value_range: &[i64; 2]) -> Self {
+        let dim = dim.max(1);
+        Self {
+            v: (0..dim).map(|_| sample_in(rng, value_range)).collect(),
+        }
+    }
+
+    fn value(&self) -> i64 {
+        self.v.iter().map(|x| x * x).sum()
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "v = {}, \\quad \\lVert v \\rVert^2 = \\;?",
+                row_vec(&self.v)
+            ),
+            solution: self.value().to_string(),
+            steps: vec![
+                "The squared magnitude is the sum of the squared components.".to_string(),
+                format!(
+                    "$= {} = {}$.",
+                    self.v.iter().map(|x| format!("({})^2", x)).collect::<Vec<_>>().join(" + "),
+                    self.value()
+                ),
+            ],
+            hints: vec!["$\\lVert v \\rVert^2 = v_1^2 + v_2^2 + \\cdots$ — no square root here.".to_string()],
+        }
+    }
+}
+
+struct UniformPmf {
+    n: i64,
+    k: i64,
+}
+
+impl UniformPmf {
+    fn sample(rng: &mut impl Rng, sides_range: &[i64; 2]) -> Self {
+        let n = sample_in(rng, sides_range).max(2);
+        Self {
+            n,
+            k: rng.random_range(1..=n),
+        }
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\text{{A fair }} {n}\\text{{-sided die is rolled. }} P(X = {k}) = \\;?",
+                n = self.n,
+                k = self.k
+            ),
+            solution: format!("1/{}", self.n),
+            steps: vec![
+                "Every face of a fair die is equally likely.".to_string(),
+                format!(
+                    "With {n} equally likely outcomes, $P(X = {k}) = \\dfrac{{1}}{{{n}}}$.",
+                    n = self.n,
+                    k = self.k
+                ),
+            ],
+            hints: vec!["A fair $n$-sided die gives each face probability $1/n$.".to_string()],
+        }
+    }
+}
+
 // --- Physics instances (answers include units) ---
 
 struct AverageSpeed {
@@ -2526,6 +2703,26 @@ mod tests {
 
             let det = MatrixDeterminant2x2::sample(&mut r, &[-6, 6]);
             assert_eq!(det.det(), det.m[0][0] * det.m[1][1] - det.m[0][1] * det.m[1][0]);
+        }
+    }
+
+    #[test]
+    fn prob_and_vector_second_forms_are_correct() {
+        let mut r = rng();
+        for _ in 0..1000 {
+            let ex = LinearityOfExpectation::sample(&mut r, &[-9, 9], &[1, 5], &[-9, 9]);
+            assert_eq!(ex.value(), ex.a * ex.m + ex.b);
+
+            let var = VarianceScaling::sample(&mut r, &[1, 12], &[-5, 5]);
+            assert_eq!(var.value(), var.a * var.a * var.v);
+            assert!(var.value() >= 0, "variance is never negative");
+
+            let mag = VectorMagnitudeSquared::sample(&mut r, 3, &[-6, 6]);
+            assert_eq!(mag.value(), mag.v.iter().map(|x| x * x).sum::<i64>());
+
+            let pmf = UniformPmf::sample(&mut r, &[2, 12]);
+            assert!(pmf.k >= 1 && pmf.k <= pmf.n);
+            assert_eq!(pmf.render().solution, format!("1/{}", pmf.n));
         }
     }
 
