@@ -243,6 +243,31 @@ pub enum TemplateKind {
     VectorMagnitudeSquared { dim: usize, value_range: [i64; 2] },
     /// PMF of a fair n-sided die: `P(X = k) = 1/n`.
     UniformPmf { sides_range: [i64; 2] },
+
+    // --- #4 deep vertical: more calculus-for-ML concepts ---
+    /// Second derivative of a cubic: `d²/dx²(a·x³ + b·x² + …)` → `6a·x + 2b`.
+    SecondDerivative {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+        d_range: [i64; 2],
+    },
+    /// Critical point of `a·x² + b·x + c`: where `f'(x)=0`, i.e. `x = -b/(2a)`.
+    CriticalPoint {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+    },
+    /// Derivative of `e^{a·x}` → `a·e^{a·x}` (chain rule with the exponential).
+    ExponentialDerivative { coeff_range: [i64; 2] },
+    /// Derivative of `ln(a·x)` → `1/x` (independent of `a`, for `a>0`).
+    LogDerivative { coeff_range: [i64; 2] },
+    /// Minimum value of an upward parabola `a·x² + b·x + c` (a>0): `(4ac − b²)/(4a)`.
+    QuadraticMinimum {
+        a_range: [i64; 2],
+        b_range: [i64; 2],
+        c_range: [i64; 2],
+    },
 }
 
 /// A rendered instance: the problem statement and its solution, both as LaTeX.
@@ -466,6 +491,28 @@ impl TemplateKind {
             TemplateKind::UniformPmf { sides_range } => {
                 UniformPmf::sample(rng, sides_range).render()
             }
+            TemplateKind::SecondDerivative {
+                a_range,
+                b_range,
+                c_range,
+                d_range,
+            } => SecondDerivative::sample(rng, a_range, b_range, c_range, d_range).render(),
+            TemplateKind::CriticalPoint {
+                a_range,
+                b_range,
+                c_range,
+            } => CriticalPoint::sample(rng, a_range, b_range, c_range).render(),
+            TemplateKind::ExponentialDerivative { coeff_range } => {
+                ExponentialDerivative::sample(rng, coeff_range).render()
+            }
+            TemplateKind::LogDerivative { coeff_range } => {
+                LogDerivative::sample(rng, coeff_range).render()
+            }
+            TemplateKind::QuadraticMinimum {
+                a_range,
+                b_range,
+                c_range,
+            } => QuadraticMinimum::sample(rng, a_range, b_range, c_range).render(),
         }
     }
 }
@@ -1984,6 +2031,226 @@ impl UniformPmf {
     }
 }
 
+// --- Deep-vertical calculus instances ---
+
+struct SecondDerivative {
+    a: i64,
+    b: i64,
+    c: i64,
+    d: i64,
+}
+
+impl SecondDerivative {
+    fn sample(rng: &mut impl Rng, a_range: &[i64; 2], b_range: &[i64; 2], c_range: &[i64; 2], d_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+            c: sample_in(rng, c_range),
+            d: sample_in(rng, d_range),
+        }
+    }
+
+    /// Verification: `d²/dx²` matches a second central difference of the cubic.
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        let f = |x: f64| {
+            self.a as f64 * x * x * x + self.b as f64 * x * x + self.c as f64 * x + self.d as f64
+        };
+        let f2 = |x: f64| 6.0 * self.a as f64 * x + 2.0 * self.b as f64;
+        let h = 1e-3;
+        [0.5_f64, 1.4, 2.1].iter().all(|&x| {
+            let numeric = (f(x + h) - 2.0 * f(x) + f(x - h)) / (h * h);
+            (numeric - f2(x)).abs() < 1e-1
+        })
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!(
+                "\\frac{{d^2}}{{dx^2}}\\left( {} \\right)",
+                cubic(self.a, self.b, self.c, self.d)
+            ),
+            solution: linear_lhs(6 * self.a, 2 * self.b),
+            steps: vec![
+                "Differentiate once (power rule term by term), then differentiate again.".to_string(),
+                format!(
+                    "First derivative: ${}$.",
+                    // f'(x) = 3a x² + 2b x + c
+                    quadratic(3 * self.a, 2 * self.b, self.c)
+                ),
+                format!("Differentiate again: ${}$.", linear_lhs(6 * self.a, 2 * self.b)),
+            ],
+            hints: vec!["Apply the power rule twice.".to_string()],
+        }
+    }
+}
+
+struct CriticalPoint {
+    a: i64,
+    b: i64,
+    c: i64,
+}
+
+impl CriticalPoint {
+    fn sample(rng: &mut impl Rng, a_range: &[i64; 2], b_range: &[i64; 2], c_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_nonzero(rng, a_range),
+            b: sample_in(rng, b_range),
+            c: sample_in(rng, c_range),
+        }
+    }
+
+    /// `x = -b / (2a)`, reduced.
+    fn point(&self) -> (i64, i64) {
+        let (mut num, mut den) = (-self.b, 2 * self.a);
+        if den < 0 {
+            num = -num;
+            den = -den;
+        }
+        let g = gcd(num, den).max(1);
+        (num / g, den / g)
+    }
+
+    fn render(&self) -> Instance {
+        let (num, den) = self.point();
+        Instance {
+            content: format!(
+                "\\text{{Find the critical point of }} f(x) = {}. \\quad x = \\;?",
+                quadratic(self.a, self.b, self.c)
+            ),
+            solution: fraction_str(num, den),
+            steps: vec![
+                "A critical point is where the derivative is zero.".to_string(),
+                format!("$f'(x) = {} = 0$.", linear_lhs(2 * self.a, self.b)),
+                format!("Solve for $x$: $x = {}$.", fraction_str(num, den)),
+            ],
+            hints: vec!["Set $f'(x) = 0$ and solve.".to_string()],
+        }
+    }
+}
+
+struct ExponentialDerivative {
+    a: i64,
+}
+
+impl ExponentialDerivative {
+    fn sample(rng: &mut impl Rng, coeff_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_nonzero(rng, coeff_range),
+        }
+    }
+
+    /// `d/dx e^{ax} = a e^{ax}`.
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        let f = |x: f64| (self.a as f64 * x).exp();
+        let f_prime = |x: f64| self.a as f64 * (self.a as f64 * x).exp();
+        let h = 1e-5;
+        [0.1_f64, 0.4].iter().all(|&x| {
+            let numeric = (f(x + h) - f(x - h)) / (2.0 * h);
+            (numeric - f_prime(x)).abs() <= 1e-3 * f_prime(x).abs().max(1.0)
+        })
+    }
+
+    fn render(&self) -> Instance {
+        let exp = linear_lhs(self.a, 0); // "ax" / "x" / "-x"
+        let coeff = match self.a {
+            1 => String::new(),
+            -1 => "-".to_string(),
+            n => n.to_string(),
+        };
+        Instance {
+            content: format!("\\frac{{d}}{{dx}}\\left( e^{{{}}} \\right)", exp),
+            solution: format!("{coeff}e^{{{exp}}}"),
+            steps: vec![
+                "The derivative of $e^{u}$ is $e^{u}$ times the derivative of $u$ (chain rule)."
+                    .to_string(),
+                format!(
+                    "Here $u = {}$, so $u' = {}$, giving ${}e^{{{}}}$.",
+                    exp, self.a, coeff, exp
+                ),
+            ],
+            hints: vec!["$\\frac{d}{dx}e^{ax} = a\\,e^{ax}$.".to_string()],
+        }
+    }
+}
+
+struct LogDerivative {
+    a: i64,
+}
+
+impl LogDerivative {
+    fn sample(rng: &mut impl Rng, coeff_range: &[i64; 2]) -> Self {
+        Self {
+            a: sample_in(rng, coeff_range).abs().max(1),
+        }
+    }
+
+    /// `d/dx ln(ax) = 1/x` (for a>0).
+    #[cfg(test)]
+    fn holds(&self) -> bool {
+        let f = |x: f64| (self.a as f64 * x).ln();
+        let h = 1e-5;
+        [0.5_f64, 1.7, 3.0].iter().all(|&x| {
+            let numeric = (f(x + h) - f(x - h)) / (2.0 * h);
+            (numeric - 1.0 / x).abs() < 1e-3
+        })
+    }
+
+    fn render(&self) -> Instance {
+        Instance {
+            content: format!("\\frac{{d}}{{dx}}\\left( \\ln({}x) \\right)", self.a),
+            solution: "1/x".to_string(),
+            steps: vec![
+                format!("Rewrite: $\\ln({}x) = \\ln {} + \\ln x$.", self.a, self.a),
+                "The constant $\\ln a$ differentiates to 0, and $\\frac{d}{dx}\\ln x = \\frac{1}{x}$.".to_string(),
+                "So the derivative is $\\dfrac{1}{x}$ — the coefficient $a$ doesn't matter.".to_string(),
+            ],
+            hints: vec!["$\\frac{d}{dx}\\ln(ax) = \\frac{a}{ax} = \\frac{1}{x}$.".to_string()],
+        }
+    }
+}
+
+struct QuadraticMinimum {
+    a: i64,
+    b: i64,
+    c: i64,
+}
+
+impl QuadraticMinimum {
+    fn sample(rng: &mut impl Rng, a_range: &[i64; 2], b_range: &[i64; 2], c_range: &[i64; 2]) -> Self {
+        Self {
+            // Upward parabola so a minimum exists.
+            a: sample_in(rng, a_range).abs().max(1),
+            b: sample_in(rng, b_range),
+            c: sample_in(rng, c_range),
+        }
+    }
+
+    /// Minimum value `(4ac − b²)/(4a)`, reduced.
+    fn min_value(&self) -> (i64, i64) {
+        let (num, den) = (4 * self.a * self.c - self.b * self.b, 4 * self.a);
+        let g = gcd(num, den).max(1);
+        (num / g, den / g)
+    }
+
+    fn render(&self) -> Instance {
+        let (num, den) = self.min_value();
+        Instance {
+            content: format!(
+                "\\text{{What is the minimum value of }} f(x) = {}?",
+                quadratic(self.a, self.b, self.c)
+            ),
+            solution: fraction_str(num, den),
+            steps: vec![
+                "The minimum is at the vertex, where $f'(x) = 0$: $x = -\\dfrac{b}{2a}$.".to_string(),
+                format!("Substitute back: the minimum value is $\\dfrac{{4ac - b^2}}{{4a}} = {}$.", fraction_str(num, den)),
+            ],
+            hints: vec!["Find where $f'(x)=0$, then evaluate $f$ there.".to_string()],
+        }
+    }
+}
+
 // --- Physics instances (answers include units) ---
 
 struct AverageSpeed {
@@ -2723,6 +2990,33 @@ mod tests {
             let pmf = UniformPmf::sample(&mut r, &[2, 12]);
             assert!(pmf.k >= 1 && pmf.k <= pmf.n);
             assert_eq!(pmf.render().solution, format!("1/{}", pmf.n));
+        }
+    }
+
+    #[test]
+    fn deep_vertical_forms_are_correct() {
+        let mut r = rng();
+        for _ in 0..1000 {
+            let sd = SecondDerivative::sample(&mut r, &[1, 4], &[-6, 6], &[-9, 9], &[-9, 9]);
+            assert!(sd.holds(), "second derivative mismatch");
+
+            let cp = CriticalPoint::sample(&mut r, &[1, 5], &[-9, 9], &[-9, 9]);
+            let (num, den) = cp.point();
+            assert!(den > 0 && gcd(num, den) == 1, "critical point must be reduced");
+            // -b/(2a) means 2a·x + b = 0  →  2a·num + b·den == 0.
+            assert_eq!(2 * cp.a * num + cp.b * den, 0);
+
+            let ed = ExponentialDerivative::sample(&mut r, &[-4, 4]);
+            assert!(ed.holds(), "exp derivative mismatch");
+
+            let ld = LogDerivative::sample(&mut r, &[1, 9]);
+            assert!(ld.holds() && ld.render().solution == "1/x");
+
+            let qm = QuadraticMinimum::sample(&mut r, &[1, 5], &[-9, 9], &[-9, 9]);
+            let (num, den) = qm.min_value();
+            assert!(den > 0 && gcd(num, den) == 1);
+            // (4ac - b²)/(4a) reduced equals num/den.
+            assert_eq!(num * (4 * qm.a), den * (4 * qm.a * qm.c - qm.b * qm.b));
         }
     }
 

@@ -442,7 +442,7 @@
     {
       "id": "product_rule",
       "kind": "product_rule_derivative",
-      "concept": "derivatives",
+      "concept": "product_rule",
       "difficulty": "medium",
       "a_range": [
         1,
@@ -656,6 +656,84 @@
       "sides_range": [
         2,
         12
+      ]
+    },
+    {
+      "id": "second_deriv",
+      "kind": "second_derivative",
+      "concept": "second_derivative",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        4
+      ],
+      "b_range": [
+        -6,
+        6
+      ],
+      "c_range": [
+        -9,
+        9
+      ],
+      "d_range": [
+        -9,
+        9
+      ]
+    },
+    {
+      "id": "critical_point",
+      "kind": "critical_point",
+      "concept": "critical_points",
+      "difficulty": "medium",
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -9,
+        9
+      ],
+      "c_range": [
+        -9,
+        9
+      ]
+    },
+    {
+      "id": "exp_deriv",
+      "kind": "exponential_derivative",
+      "concept": "exponential_derivative",
+      "difficulty": "easy",
+      "coeff_range": [
+        -4,
+        4
+      ]
+    },
+    {
+      "id": "log_deriv",
+      "kind": "log_derivative",
+      "concept": "log_derivative",
+      "difficulty": "easy",
+      "coeff_range": [
+        1,
+        9
+      ]
+    },
+    {
+      "id": "quad_min",
+      "kind": "quadratic_minimum",
+      "concept": "optimization",
+      "difficulty": "hard",
+      "a_range": [
+        1,
+        5
+      ],
+      "b_range": [
+        -8,
+        8
+      ],
+      "c_range": [
+        -9,
+        9
       ]
     }
   ]
